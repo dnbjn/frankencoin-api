@@ -145,12 +145,23 @@ export class PricesService {
 
 	async fetchMarketChartCoingecko(): Promise<PriceMarketChartObject | null> {
 		const url = `/api/v3/coins/frankencoin/market_chart?vs_currency=chf&days=90`;
-		const data = await (await COINGECKO_CLIENT(url)).json();
-		if (data.status) {
-			this.logger.debug(data.status?.error_message || 'Error fetching market chart from coingecko');
+		try {
+			const res = await COINGECKO_CLIENT(url);
+			if (!res.ok) {
+				const body = await res.text();
+				this.logger.warn(`CoinGecko ${res.status} ${res.statusText}: ${body.slice(0, 200)}`);
+				return null;
+			}
+			const data = await res.json();
+			if (data.status) {
+				this.logger.debug(data.status?.error_message || 'Error fetching market chart from coingecko');
+				return null;
+			}
+			return data;
+		} catch (err) {
+			this.logger.warn(`fetchMarketChartCoingecko failed: ${err instanceof Error ? err.message : String(err)}`);
 			return null;
 		}
-		return data;
 	}
 
 	async fetchPriceTheGraph(erc: ERC20Info): Promise<PriceQueryCurrencies | null> {
