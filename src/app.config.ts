@@ -25,8 +25,8 @@ export type ConfigType = {
 
 // Create config
 export const CONFIG: ConfigType = {
-	app: process.env.CONFIG_APP_URL || 'https://app.frankencoin.com',
-	indexer: process.env.CONFIG_INDEXER_URL || 'https://ponder.frankencoin.com',
+	app: process.env.CONFIG_APP_URL || 'https://zchf.app',
+	indexer: process.env.CONFIG_INDEXER_URL || 'https://ponder.zchf.app',
 	backupIndexer: process.env.CONFIG_BACKUP_INDEXER_URL || null,
 	coingeckoApiKey: process.env.COINGECKO_API_KEY,
 	alchemyRpcKey: process.env.ALCHEMY_RPC_KEY,

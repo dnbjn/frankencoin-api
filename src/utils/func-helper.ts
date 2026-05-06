@@ -10,7 +10,7 @@ export function ExplorerTxUrl(tx: string, chain: Chain = mainnet): string {
 }
 
 export function AppUrl(path: string, chain: Chain = mainnet): string {
-	return `${chain.id == 1 ? 'https://app.frankencoin.com' : 'https://app.test.frankencoin.com'}${path}`;
+	return `${chain.id == 1 ? 'https://zchf.app' : 'https://test.zchf.app'}${path}`;
 }
 
 export const getChain = (id: ChainId) => {

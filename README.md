@@ -13,8 +13,8 @@ $ yarn install
 ```
 PORT=3030
 
-CONFIG_APP_URL=https://app.frankencoin.com
-CONFIG_INDEXER_URL=https://ponder.frankencoin.com
+CONFIG_APP_URL=https://zchf.app
+CONFIG_INDEXER_URL=https://ponder.zchf.app
 CONFIG_CHAIN=mainnet
 
 RPC_URL_MAINNET=https://eth-mainnet.g.alchemy.com/v2/...

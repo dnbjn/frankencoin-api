@@ -38,7 +38,7 @@ export class StatusController {
 						primary: {
 							type: 'object',
 							properties: {
-								url: { type: 'string', example: 'https://ponder.frankencoin.com' },
+								url: { type: 'string', example: 'https://ponder.zchf.app' },
 								status: { type: 'string', enum: ['healthy', 'unhealthy', 'unknown'] },
 								blockNumber: { type: 'string', description: 'Latest indexed block' },
 								blockTimestamp: { type: 'number', description: 'Latest block timestamp' },
