@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PONDER_CLIENT, VIEM_CONFIG } from 'app.config';
+import { VIEM_CONFIG } from 'app.config';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import { EcosystemFpsService } from 'modules/ecosystem/ecosystem.fps.service';
 import { PositionsService } from 'modules/positions/positions.service';
 import { uniqueValues } from 'utils/format-array';
@@ -35,19 +36,19 @@ export class AnalyticsService {
 		private readonly fps: EcosystemFpsService,
 		private readonly fc: EcosystemFrankencoinService,
 		private readonly minters: EcosystemMinterService,
-		private readonly save: SavingsCoreService
+		private readonly save: SavingsCoreService,
+		private readonly dataSource: DataSourceManagerService
 	) {
 		setTimeout(() => this.updateDailyLog(), 10000);
 	}
 
 	async getProfitLossLog(): Promise<ApiAnalyticsProfitLossLog> {
 		this.logger.debug('Fetching profit loss log...');
-		const response = await PONDER_CLIENT.query<{
+		const data = await this.dataSource.queryWithFailover<{
 			frankencoinProfitLosss: {
 				items: AnalyticsProfitLossLog[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					frankencoinProfitLosss(orderBy: "count", orderDirection: "desc", limit: 1000) {
@@ -67,12 +68,12 @@ export class AnalyticsService {
 			`,
 		});
 
-		if (!response.data || !response.data.frankencoinProfitLosss.items) {
+		if (!data || !data.frankencoinProfitLosss.items) {
 			this.logger.warn('No profitloss data found.');
 			return;
 		}
 
-		const logs = response.data.frankencoinProfitLosss.items as AnalyticsProfitLossLog[];
+		const logs = data.frankencoinProfitLosss.items as AnalyticsProfitLossLog[];
 
 		return {
 			num: logs.length,
@@ -225,12 +226,11 @@ export class AnalyticsService {
 
 	async getTransactionLog(latest: boolean, limit: number = 50, after: string = ''): Promise<ApiTransactionLog> {
 		this.logger.debug('Fetching transaction log...');
-		const txLog = await PONDER_CLIENT.query<{
+		const txLog = await this.dataSource.queryWithFailover<{
 			analyticTransactionLogs: {
 				items: AnalyticsTransactionLog[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					analyticTransactionLogs(orderBy: "count", orderDirection: "${latest ? 'desc' : 'asc'}", limit: ${limit}, ${after.length > 0 ? `after: "${after}"` : ''}) {
@@ -279,18 +279,18 @@ export class AnalyticsService {
 			`,
 		});
 
-		if (!txLog.data || !txLog.data.analyticTransactionLogs.items) {
+		if (!txLog || !txLog.analyticTransactionLogs.items) {
 			this.logger.warn('No transaction log data found.');
 			return;
 		}
 
-		const logs = txLog.data.analyticTransactionLogs.items;
+		const logs = txLog.analyticTransactionLogs.items;
 
 		return {
 			num: logs.length,
 			logs,
 			// @ts-expect-error not in type
-			pageInfo: txLog.data.analyticTransactionLogs.pageInfo ?? {
+			pageInfo: txLog.analyticTransactionLogs.pageInfo ?? {
 				startCursor: '',
 				endCursor: '',
 				hasNextPage: false,
@@ -301,12 +301,11 @@ export class AnalyticsService {
 	@Interval(10 * 60 * 1000) // 10min
 	async updateDailyLog() {
 		this.logger.debug('Fetching daily log...');
-		const fetched = await PONDER_CLIENT.query<{
+		const fetched = await this.dataSource.queryWithFailover<{
 			analyticDailyLogs: {
 				items: AnalyticsDailyLog[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					analyticDailyLogs(orderBy: "timestamp", orderDirection: "asc", limit: 1000) {
@@ -347,12 +346,12 @@ export class AnalyticsService {
 			`,
 		});
 
-		if (!fetched.data || !fetched.data.analyticDailyLogs.items) {
+		if (!fetched || !fetched.analyticDailyLogs.items) {
 			this.logger.warn('No daily log data found.');
 			return;
 		}
 
-		this.fetchedDailyLogs = fetched.data.analyticDailyLogs.items;
+		this.fetchedDailyLogs = fetched.analyticDailyLogs.items;
 	}
 
 	getDailyLog(): ApiDailyLog {

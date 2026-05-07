@@ -13,7 +13,7 @@ import {
 	SavingsStatusMapping,
 	SavingsStatusQuery,
 } from './savings.core.types';
-import { PONDER_CLIENT } from 'app.config';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import { formatFloat } from 'utils/format';
 import { Address } from 'viem';
 
@@ -23,7 +23,10 @@ export class SavingsCoreService {
 	private fetchedStatus: SavingsStatusMapping = {} as SavingsStatusMapping;
 	private fetchedRanked: SavingsBalance[] = [];
 
-	constructor(private readonly fc: EcosystemFrankencoinService) {}
+	constructor(
+		private readonly fc: EcosystemFrankencoinService,
+		private readonly dataSource: DataSourceManagerService
+	) {}
 
 	getInfo(): ApiSavingsInfo {
 		const totalBalance = Object.values(this.fetchedStatus).reduce((a, b) => {
@@ -52,12 +55,11 @@ export class SavingsCoreService {
 
 	async getBalance(account: Address): Promise<ApiSavingsBalance> {
 		this.logger.debug('getting getBalance');
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			savingsMappings: {
 				items: SavingsBalanceQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					savingsMappings(where: { balance_gt: "0", account: "${account}" }, orderBy: "balance", orderDirection: "DESC", limit: 1000) {
@@ -80,12 +82,12 @@ export class SavingsCoreService {
 			`,
 		});
 
-		if (!response.data || !response.data.savingsMappings?.items) {
+		if (!response || !response.savingsMappings?.items) {
 			this.logger.warn('No savingsMappings data found.');
 			return {} as ApiSavingsBalance;
 		}
 
-		const data = response.data.savingsMappings.items;
+		const data = response.savingsMappings.items;
 
 		const list: SavingsBalanceChainIdMapping = {} as SavingsBalanceChainIdMapping;
 		for (const r of data) {
@@ -118,12 +120,11 @@ export class SavingsCoreService {
 
 	async getActivity(account: Address): Promise<ApiSavingsActivity> {
 		this.logger.debug('getting getActivity');
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			savingsActivitys: {
 				items: SavingsActivityQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					savingsActivitys(where: { account: "${account}" }, orderBy: "created", orderDirection: "DESC", limit: 1000) {
@@ -148,12 +149,12 @@ export class SavingsCoreService {
 			`,
 		});
 
-		if (!response.data || !response.data.savingsActivitys?.items) {
+		if (!response || !response.savingsActivitys?.items) {
 			this.logger.warn('No savingsActivitys data found.');
 			return {} as ApiSavingsActivity;
 		}
 
-		const data = response.data.savingsActivitys.items;
+		const data = response.savingsActivitys.items;
 
 		const list: SavingsActivityQuery[] = [];
 		for (const r of data) {
@@ -181,12 +182,11 @@ export class SavingsCoreService {
 
 	async updateSavingsStatus() {
 		this.logger.debug('Updating savings status');
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			savingsStatuss: {
 				items: SavingsStatusQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					savingsStatuss(orderBy: "updated", orderDirection: "DESC", limit: 1000) {
@@ -210,12 +210,12 @@ export class SavingsCoreService {
 			`,
 		});
 
-		if (!response.data || !response.data.savingsStatuss?.items) {
+		if (!response || !response.savingsStatuss?.items) {
 			this.logger.warn('No savingsStatuss data found.');
 			return;
 		}
 
-		const d = response.data.savingsStatuss.items;
+		const d = response.savingsStatuss.items;
 
 		const list: SavingsStatusMapping = {} as SavingsStatusMapping;
 		for (const r of d) {
@@ -247,12 +247,11 @@ export class SavingsCoreService {
 
 	async updateSavingsRank() {
 		this.logger.debug('Updating updateSavingsRank');
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			savingsMappings: {
 				items: SavingsBalanceQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					savingsMappings(where: { balance_gt: "0" }, orderBy: "balance", orderDirection: "DESC", limit: 20) {
@@ -275,12 +274,12 @@ export class SavingsCoreService {
 			`,
 		});
 
-		if (!response.data || !response.data.savingsMappings?.items) {
+		if (!response || !response.savingsMappings?.items) {
 			this.logger.warn('No savingsMappings data found.');
 			return;
 		}
 
-		const d = response.data.savingsMappings.items;
+		const d = response.savingsMappings.items;
 
 		const ranked: SavingsBalance[] = [];
 		for (const r of d) {

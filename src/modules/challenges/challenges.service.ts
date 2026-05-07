@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { gql } from '@apollo/client/core';
-import { PONDER_CLIENT, VIEM_CONFIG } from 'app.config';
+import { VIEM_CONFIG } from 'app.config';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import {
 	ApiBidsBidders,
 	ApiBidsChallenges,
@@ -38,7 +39,7 @@ export class ChallengesService {
 	private fetchedBidsMapping: BidsQueryItemMapping = {};
 	private fetchedPrices: ChallengesPricesMapping = {};
 
-	constructor() {}
+	constructor(private readonly dataSource: DataSourceManagerService) {}
 
 	getChallenges(): ApiChallengesListing {
 		return {
@@ -198,12 +199,11 @@ export class ChallengesService {
 	// --------------------------------------------------------------------------
 	async updateChallengeV1s() {
 		this.logger.debug('Updating Challenges V1');
-		const challenges = await PONDER_CLIENT.query<{
+		const challenges = await this.dataSource.queryWithFailover<{
 			mintingHubV1ChallengeV1s: {
 				items: ChallengesQueryItem[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					mintingHubV1ChallengeV1s(orderBy: "status", orderDirection: "asc", limit: 1000) {
@@ -227,13 +227,13 @@ export class ChallengesService {
 			`,
 		});
 
-		if (!challenges.data || !challenges?.data?.mintingHubV1ChallengeV1s?.items?.length) {
+		if (!challenges || !challenges?.mintingHubV1ChallengeV1s?.items?.length) {
 			this.logger.warn('No Challenge V1 found.');
 			return;
 		}
 
 		// mapping
-		const list = challenges.data.mintingHubV1ChallengeV1s.items as ChallengesQueryItem[];
+		const list = challenges.mintingHubV1ChallengeV1s.items as ChallengesQueryItem[];
 
 		const mapped: ChallengesQueryItemMapping = {};
 		for (const i of list) {
@@ -250,12 +250,11 @@ export class ChallengesService {
 	// --------------------------------------------------------------------------
 	async updateBidV1s() {
 		this.logger.debug('Updating Bids V1');
-		const bids = await PONDER_CLIENT.query<{
+		const bids = await this.dataSource.queryWithFailover<{
 			mintingHubV1ChallengeBidV1s: {
 				items: BidsQueryItem[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					mintingHubV1ChallengeBidV1s(orderBy: "created", orderDirection: "desc", limit: 1000) {
@@ -278,13 +277,13 @@ export class ChallengesService {
 			`,
 		});
 
-		if (!bids.data || !bids.data?.mintingHubV1ChallengeBidV1s?.items?.length) {
+		if (!bids || !bids?.mintingHubV1ChallengeBidV1s?.items?.length) {
 			this.logger.warn('No Bids V1 found.');
 			return;
 		}
 
 		// mapping
-		const list = bids.data.mintingHubV1ChallengeBidV1s.items as BidsQueryItem[];
+		const list = bids.mintingHubV1ChallengeBidV1s.items as BidsQueryItem[];
 		const mapped: BidsQueryItemMapping = {};
 		for (const i of list) {
 			const key = `${normalizeAddress(i.position)}-challenge-${i.number}-bid-${i.numberBid}`;
@@ -300,12 +299,11 @@ export class ChallengesService {
 	// --------------------------------------------------------------------------
 	async updateChallengeV2s() {
 		this.logger.debug('Updating Challenges V2');
-		const challenges = await PONDER_CLIENT.query<{
+		const challenges = await this.dataSource.queryWithFailover<{
 			mintingHubV2ChallengeV2s: {
 				items: ChallengesQueryItem[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					mintingHubV2ChallengeV2s(orderBy: "status", orderDirection: "asc", limit: 1000) {
@@ -329,13 +327,13 @@ export class ChallengesService {
 			`,
 		});
 
-		if (!challenges.data || !challenges?.data?.mintingHubV2ChallengeV2s?.items?.length) {
+		if (!challenges || !challenges?.mintingHubV2ChallengeV2s?.items?.length) {
 			this.logger.warn('No Challenge V2 found.');
 			return;
 		}
 
 		// mapping
-		const list = challenges.data.mintingHubV2ChallengeV2s.items as ChallengesQueryItem[];
+		const list = challenges.mintingHubV2ChallengeV2s.items as ChallengesQueryItem[];
 		const mapped: ChallengesQueryItemMapping = {};
 		for (const i of list) {
 			const key = `${normalizeAddress(i.position)}-challenge-${i.number}`;
@@ -351,12 +349,11 @@ export class ChallengesService {
 	// --------------------------------------------------------------------------
 	async updateBidV2s() {
 		this.logger.debug('Updating Bids V2');
-		const bids = await PONDER_CLIENT.query<{
+		const bids = await this.dataSource.queryWithFailover<{
 			mintingHubV2ChallengeBidV2s: {
 				items: BidsQueryItem[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					mintingHubV2ChallengeBidV2s(orderBy: "created", orderDirection: "desc", limit: 1000) {
@@ -379,13 +376,13 @@ export class ChallengesService {
 			`,
 		});
 
-		if (!bids.data || !bids.data?.mintingHubV2ChallengeBidV2s?.items?.length) {
+		if (!bids || !bids?.mintingHubV2ChallengeBidV2s?.items?.length) {
 			this.logger.warn('No Bids V2 found.');
 			return;
 		}
 
 		// mapping
-		const list = bids.data.mintingHubV2ChallengeBidV2s.items as BidsQueryItem[];
+		const list = bids.mintingHubV2ChallengeBidV2s.items as BidsQueryItem[];
 		const mapped: BidsQueryItemMapping = {};
 		for (const i of list) {
 			const key = `${normalizeAddress(i.position)}-challenge-${i.number}-bid-${i.numberBid}`;

@@ -1,6 +1,6 @@
 import { gql } from '@apollo/client/core';
 import { Injectable, Logger } from '@nestjs/common';
-import { PONDER_CLIENT } from 'app.config';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import { Address } from 'viem';
 import {
 	ApiSavingsReferrerEarnings,
@@ -16,6 +16,8 @@ import { formatFloat, normalizeAddress } from 'utils/format';
 export class SavingsReferrerService {
 	private readonly logger = new Logger(this.constructor.name);
 
+	constructor(private readonly dataSource: DataSourceManagerService) {}
+
 	getMapping(referrer: Address): Promise<ApiSavingsReferrerMapping> {
 		return this.fetchReferrerMapping(referrer);
 	}
@@ -28,12 +30,11 @@ export class SavingsReferrerService {
 		this.logger.debug('Fetching savings referrer mapping');
 		referrer = normalizeAddress(referrer);
 
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			savingsReferrerMappings: {
 				items: SavingsReferrerMappingQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					savingsReferrerMappings(
@@ -57,12 +58,12 @@ export class SavingsReferrerService {
 			`,
 		});
 
-		if (!response.data || !response.data.savingsReferrerMappings?.items) {
+		if (!response || !response.savingsReferrerMappings?.items) {
 			this.logger.warn('No savingsReferrerMappings data found.');
 			return;
 		}
 
-		const d = response.data.savingsReferrerMappings.items;
+		const d = response.savingsReferrerMappings.items;
 
 		const accounts: Address[] = [];
 		const map: SavingsReferrerMapping = {} as SavingsReferrerMapping;
@@ -96,12 +97,11 @@ export class SavingsReferrerService {
 		this.logger.debug('Fetching savings referrer earnings');
 		referrer = normalizeAddress(referrer);
 
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			savingsReferrerEarningss: {
 				items: SavingsReferrerEarningsQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					savingsReferrerEarningss(
@@ -124,12 +124,12 @@ export class SavingsReferrerService {
 			`,
 		});
 
-		if (!response.data || !response.data.savingsReferrerEarningss?.items) {
+		if (!response || !response.savingsReferrerEarningss?.items) {
 			this.logger.warn('No savingsReferrerEarningss data found.');
 			return;
 		}
 
-		const d = response.data.savingsReferrerEarningss.items;
+		const d = response.savingsReferrerEarningss.items;
 
 		const earnings: SavingsReferrerEarnings = {} as SavingsReferrerEarnings;
 		const chains: ApiSavingsReferrerEarnings['chains'] = {} as ApiSavingsReferrerEarnings['chains'];

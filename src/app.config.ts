@@ -48,9 +48,9 @@ export const PONDER_CLIENT = new ApolloClient({
 // PONDER CLIENT BACKUP (Backup Indexer)
 export const PONDER_CLIENT_BACKUP = CONFIG.backupIndexer
 	? new ApolloClient({
-			uri: CONFIG.backupIndexer,
-			cache: new InMemoryCache(),
-		})
+		uri: CONFIG.backupIndexer,
+		cache: new InMemoryCache(),
+	})
 	: null;
 
 // VIEM CONFIG BY CHAINS

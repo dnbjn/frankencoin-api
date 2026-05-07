@@ -1,16 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PONDER_CLIENT, VIEM_CONFIG } from 'app.config';
+import { VIEM_CONFIG } from 'app.config';
 import { ApiEcosystemFpsInfo } from './ecosystem.fps.types';
 import { gql } from '@apollo/client/core';
 import { ADDRESS } from '@frankencoin/zchf';
 import { EquityABI, FrankencoinABI, ChainIdMain } from '@frankencoin/zchf';
 import { mainnet } from 'viem/chains';
 import { formatFloat } from 'utils/format';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 
 @Injectable()
 export class EcosystemFpsService {
 	private readonly logger = new Logger(this.constructor.name);
 	private fpsInfo: ApiEcosystemFpsInfo;
+
+	constructor(private readonly dataSource: DataSourceManagerService) {}
 
 	getEcosystemFpsInfo(): ApiEcosystemFpsInfo {
 		return this.fpsInfo;
@@ -46,7 +49,7 @@ export class EcosystemFpsService {
 			args: [ADDRESS[chainId].equity],
 		});
 
-		const response = await PONDER_CLIENT.query<{
+		const data = await this.dataSource.queryWithFailover<{
 			frankencoinProfitLosss: {
 				items: {
 					profits: bigint;
@@ -54,7 +57,6 @@ export class EcosystemFpsService {
 				}[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					frankencoinProfitLosss(orderBy: "count", orderDirection: "DESC", limit: 1) {
@@ -67,12 +69,12 @@ export class EcosystemFpsService {
 			`,
 		});
 
-		if (!response.data || !response.data.frankencoinProfitLosss.items) {
+		if (!data || !data.frankencoinProfitLosss.items) {
 			this.logger.warn('No profitLossPonder data found.');
 			return;
 		}
 
-		const d = response.data.frankencoinProfitLosss.items.at(0);
+		const d = data.frankencoinProfitLosss.items.at(0);
 
 		this.fpsInfo = {
 			erc20: {

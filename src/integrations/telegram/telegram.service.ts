@@ -36,7 +36,8 @@ import { PositionDeniedMessage } from './messages/PositionDenied.message';
 export class TelegramService {
 	private readonly startUpTime = Date.now();
 	private readonly logger = new Logger(this.constructor.name);
-	private readonly bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+	private readonly enabled = !!process.env.TELEGRAM_BOT_TOKEN;
+	private readonly bot = this.enabled ? new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true }) : null;
 	private telegramHandles: string[] = ['/MintingUpdates', '/PriceAlerts', '/DailyInfos', '/help'];
 	private telegramState: TelegramState;
 	private telegramGroupState: TelegramGroupState;
@@ -51,6 +52,10 @@ export class TelegramService {
 		private readonly challenge: ChallengesService,
 		private readonly analytics: AnalyticsService
 	) {
+		if (!this.enabled) {
+			this.logger.warn('TELEGRAM_BOT_TOKEN not set — Telegram integration disabled');
+		}
+
 		this.telegramState = {
 			minterApplied: this.startUpTime,
 			minterVetoed: this.startUpTime,
@@ -76,7 +81,7 @@ export class TelegramService {
 			subscription: {},
 		};
 
-		this.readBackupGroups();
+		if (this.enabled) this.readBackupGroups();
 	}
 
 	async readBackupGroups() {
@@ -149,6 +154,7 @@ export class TelegramService {
 	}
 
 	async sendMessage(group: string | number, message: string) {
+		if (!this.enabled) return;
 		try {
 			this.logger.log(`Sending message to group id: ${group}`);
 			await this.bot.sendMessage(group.toString(), message, { parse_mode: 'Markdown', disable_web_page_preview: true });
@@ -179,6 +185,7 @@ export class TelegramService {
 	}
 
 	async updateTelegram() {
+		if (!this.enabled) return;
 		// @dev: deactivated, verify indexer status before running workflow.
 		// give indexer and start up some time before starting with msg, alert, ...
 		// if (Date.now() < this.startUpTime + 20 * 60 * 1000) return; // 20min
@@ -569,6 +576,7 @@ export class TelegramService {
 
 	@Cron(CronExpression.EVERY_WEEK)
 	scheduleDailyInfos() {
+		if (!this.enabled) return;
 		const days = 1000 * 3600 * 24 * 30;
 		const infos = this.analytics.getDailyLog().logs.filter((i) => Number(i.timestamp) >= Date.now() - days);
 		const groups = this.getSubscribedGroups('/DailyInfos');

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { gql } from '@apollo/client/core';
-import { PONDER_CLIENT } from 'app.config';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import {
 	EcosystemQuery,
 	EcosystemERC20StatusQuery,
@@ -33,7 +33,8 @@ export class EcosystemFrankencoinService {
 		private readonly prisma: PrismaService,
 		private readonly fpsService: EcosystemFpsService,
 		private readonly collService: EcosystemCollateralService,
-		private readonly pricesService: PricesService
+		private readonly pricesService: PricesService,
+		private readonly dataSource: DataSourceManagerService
 	) {
 		this.readBackupSupplyQuery();
 	}
@@ -126,12 +127,11 @@ export class EcosystemFrankencoinService {
 
 	async updateEcosystemKeyValues() {
 		this.logger.debug('Updating EcosystemKeyValues');
-		const response = await PONDER_CLIENT.query<{
+		const data = await this.dataSource.queryWithFailover<{
 			commonEcosystems: {
 				items: EcosystemQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					commonEcosystems(orderBy: "id", limit: 1000) {
@@ -145,12 +145,12 @@ export class EcosystemFrankencoinService {
 			`,
 		});
 
-		if (!response.data || !response.data.commonEcosystems.items) {
+		if (!data || !data.commonEcosystems.items) {
 			this.logger.warn('No commonEcosystems data found.');
 			return;
 		}
 
-		const d = response.data.commonEcosystems.items;
+		const d = data.commonEcosystems.items;
 
 		// key values mapping
 		const mappingKeyValues: EcosystemFrankencoinKeyValues = {};
@@ -165,12 +165,11 @@ export class EcosystemFrankencoinService {
 
 	async updateEcosystemERC20Status() {
 		this.logger.debug('Updating EcosystemERC20Status');
-		const response = await PONDER_CLIENT.query<{
+		const data = await this.dataSource.queryWithFailover<{
 			eRC20Statuss: {
 				items: EcosystemERC20StatusQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					eRC20Statuss(orderBy: "updated", orderDirection: "DESC", limit: 1000) {
@@ -188,12 +187,12 @@ export class EcosystemFrankencoinService {
 			`,
 		});
 
-		if (!response.data || !response.data.eRC20Statuss.items) {
+		if (!data || !data.eRC20Statuss.items) {
 			this.logger.warn('No eRC20Statuss data found.');
 			return;
 		}
 
-		const d = response.data.eRC20Statuss.items;
+		const d = data.eRC20Statuss.items;
 
 		// chainId mapping
 		const updatedFrankencoin = { ...this.ecosystemFrankencoin };
@@ -251,13 +250,12 @@ export class EcosystemFrankencoinService {
 
 			while (hasNextPage) {
 				const afterArg = after ? `, after: "${after}"` : '';
-				const response = await PONDER_CLIENT.query<{
+				const pageData = await this.dataSource.queryWithFailover<{
 					eRC20TotalSupplys: {
 						items: EcosystemERC20TotalSupply[];
 						pageInfo: { endCursor: string; hasNextPage: boolean };
 					};
 				}>({
-					fetchPolicy: 'no-cache',
 					query: gql`
 					query {
 						eRC20TotalSupplys(
@@ -280,12 +278,12 @@ export class EcosystemFrankencoinService {
 				`,
 				});
 
-				if (!response.data || !response.data.eRC20TotalSupplys.items) {
+				if (!pageData || !pageData.eRC20TotalSupplys.items) {
 					this.logger.warn(`No eRC20TotalSupplys data (chain: ${chain.name}) found.`);
 					break;
 				}
 
-				const page = response.data.eRC20TotalSupplys;
+				const page = pageData.eRC20TotalSupplys;
 				allItems.push(...page.items);
 				hasNextPage = page.pageInfo.hasNextPage;
 				after = page.pageInfo.endCursor;

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PONDER_CLIENT, PONDER_CLIENT_BACKUP, VIEM_CONFIG } from 'app.config';
+import { VIEM_CONFIG } from 'app.config';
 import { gql } from '@apollo/client/core';
 import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import {
@@ -102,18 +102,13 @@ export class PositionsService {
 
 	async updatePositonV1s() {
 		this.logger.debug('Updating Positions V1');
-		const currentSource = this.dataSource.getCurrentSource();
-
-		// Determine which client to use
-		const client = currentSource === 'primary' ? PONDER_CLIENT : PONDER_CLIENT_BACKUP;
 
 		try {
-			const { data } = await client!.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				mintingHubV1PositionV1s: {
 					items: PositionQueryV1[];
 				};
 			}>({
-				fetchPolicy: 'no-cache',
 				query: gql`
 					query {
 						mintingHubV1PositionV1s(orderBy: "created", orderDirection: "desc", limit: 1000) {
@@ -275,18 +270,13 @@ export class PositionsService {
 
 	async updatePositonV2s() {
 		this.logger.debug('Updating Positions V2');
-		const currentSource = this.dataSource.getCurrentSource();
-
-		// Determine which client to use
-		const client = currentSource === 'primary' ? PONDER_CLIENT : PONDER_CLIENT_BACKUP;
 
 		try {
-			const { data } = await client!.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				mintingHubV2PositionV2s: {
 					items: PositionQueryV2[];
 				};
 			}>({
-				fetchPolicy: 'no-cache',
 				query: gql`
 					query {
 						mintingHubV2PositionV2s(orderBy: "created", orderDirection: "desc", limit: 1000) {
@@ -485,12 +475,11 @@ export class PositionsService {
 
 	async getMintingUpdatesPosition(position: Address, version: number): Promise<ApiMintingUpdateListing> {
 		if (version == 1) {
-			const { data } = await PONDER_CLIENT.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				mintingHubV1MintingUpdateV1s: {
 					items: MintingUpdateQueryV1[];
 				};
 			}>({
-				fetchPolicy: 'no-cache',
 				query: gql`
 					query {
 						mintingHubV1MintingUpdateV1s(
@@ -542,12 +531,11 @@ export class PositionsService {
 				list: items,
 			};
 		} else {
-			const { data } = await PONDER_CLIENT.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				mintingHubV2MintingUpdateV2s: {
 					items: MintingUpdateQueryV2[];
 				};
 			}>({
-				fetchPolicy: 'no-cache',
 				query: gql`
 					query {
 						mintingHubV2MintingUpdateV2s(where: { position: "${normalizeAddress(position)}" }, orderBy: "count", orderDirection: "desc", limit: 1000) {
@@ -599,10 +587,9 @@ export class PositionsService {
 	}
 
 	async getMintingUpdatesOwner(owner: Address): Promise<ApiMintingUpdateListing> {
-		const { data: version1 } = await PONDER_CLIENT.query<{
+		const version1 = await this.dataSource.queryWithFailover<{
 			mintingHubV1MintingUpdateV1s: { items: MintingUpdateQueryV1[] };
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 					query {
 						mintingHubV1MintingUpdateV1s(
@@ -639,8 +626,9 @@ export class PositionsService {
 				`,
 		});
 
-		const { data: version2 } = await PONDER_CLIENT.query<{ mintingHubV2MintingUpdateV2s: { items: MintingUpdateQueryV2[] } }>({
-			fetchPolicy: 'no-cache',
+		const version2 = await this.dataSource.queryWithFailover<{
+			mintingHubV2MintingUpdateV2s: { items: MintingUpdateQueryV2[] };
+		}>({
 			query: gql`
 					query {
 						mintingHubV2MintingUpdateV2s(where: { owner: "${normalizeAddress(owner)}" }, orderBy: "count", orderDirection: "desc", limit: 1000) {
@@ -675,8 +663,8 @@ export class PositionsService {
 		});
 
 		const items: MintingUpdateQuery[] = [
-			...version1.mintingHubV1MintingUpdateV1s.items,
-			...version2.mintingHubV2MintingUpdateV2s.items,
+			...(version1?.mintingHubV1MintingUpdateV1s.items ?? []),
+			...(version2?.mintingHubV2MintingUpdateV2s.items ?? []),
 		];
 
 		return {
@@ -687,18 +675,13 @@ export class PositionsService {
 
 	async updateMintingUpdateV1s() {
 		this.logger.debug('Updating Positions MintingUpdates V1');
-		const currentSource = this.dataSource.getCurrentSource();
-
-		// Determine which client to use
-		const client = currentSource === 'primary' ? PONDER_CLIENT : PONDER_CLIENT_BACKUP;
 
 		try {
-			const { data } = await client!.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				mintingHubV1MintingUpdateV1s: {
 					items: MintingUpdateQueryV1[];
 				};
 			}>({
-				fetchPolicy: 'no-cache',
 				query: gql`
 					query {
 						mintingHubV1MintingUpdateV1s(orderBy: "created", orderDirection: "desc", limit: 1000) {
@@ -790,18 +773,13 @@ export class PositionsService {
 
 	async updateMintingUpdateV2s() {
 		this.logger.debug('Updating Positions MintingUpdates V2');
-		const currentSource = this.dataSource.getCurrentSource();
-
-		// Determine which client to use
-		const client = currentSource === 'primary' ? PONDER_CLIENT : PONDER_CLIENT_BACKUP;
 
 		try {
-			const { data } = await client!.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				mintingHubV2MintingUpdateV2s: {
 					items: MintingUpdateQueryV2[];
 				};
 			}>({
-				fetchPolicy: 'no-cache',
 				query: gql`
 					query {
 						mintingHubV2MintingUpdateV2s(orderBy: "created", orderDirection: "desc", limit: 1000) {
@@ -896,10 +874,9 @@ export class PositionsService {
 	}
 
 	async getOwnerFees(owner: Address): Promise<ApiMintingUpdateListing> {
-		const { data: version1 } = await PONDER_CLIENT.query<{
+		const version1 = await this.dataSource.queryWithFailover<{
 			mintingHubV1MintingUpdateV1s: { items: MintingUpdateQueryV1[] };
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 					query {
 						mintingHubV1MintingUpdateV1s(
@@ -936,8 +913,9 @@ export class PositionsService {
 				`,
 		});
 
-		const { data: version2 } = await PONDER_CLIENT.query<{ mintingHubV2MintingUpdateV2s: { items: MintingUpdateQueryV2[] } }>({
-			fetchPolicy: 'no-cache',
+		const version2 = await this.dataSource.queryWithFailover<{
+			mintingHubV2MintingUpdateV2s: { items: MintingUpdateQueryV2[] };
+		}>({
 			query: gql`
 					query {
 						mintingHubV2MintingUpdateV2s(where: { owner: "${normalizeAddress(owner)}", feePaid_gt: "0" }, orderBy: "count", orderDirection: "desc", limit: 1000) {
@@ -972,8 +950,8 @@ export class PositionsService {
 		});
 
 		const items: MintingUpdateQuery[] = [
-			...version1.mintingHubV1MintingUpdateV1s.items,
-			...version2.mintingHubV2MintingUpdateV2s.items,
+			...(version1?.mintingHubV1MintingUpdateV1s.items ?? []),
+			...(version2?.mintingHubV2MintingUpdateV2s.items ?? []),
 		];
 
 		return {
@@ -1060,10 +1038,9 @@ export class PositionsService {
 	}
 
 	async getOwnerTransfers(owner: Address): Promise<ApiOwnerTransfersListing> {
-		const { data: version1 } = await PONDER_CLIENT.query<{
+		const version1 = await this.dataSource.queryWithFailover<{
 			mintingHubV1OwnerTransfersV1s: { items: OwnerTransferQuery[] };
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 					query {
 						mintingHubV1OwnerTransfersV1s(
@@ -1086,10 +1063,9 @@ export class PositionsService {
 				`,
 		});
 
-		const { data: version2 } = await PONDER_CLIENT.query<{
+		const version2 = await this.dataSource.queryWithFailover<{
 			mintingHubV2OwnerTransfersV2s: { items: OwnerTransferQuery[] };
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 					query {
 						mintingHubV2OwnerTransfersV2s(
@@ -1113,8 +1089,8 @@ export class PositionsService {
 		});
 
 		const items: OwnerTransferQuery[] = [
-			...version1.mintingHubV1OwnerTransfersV1s.items,
-			...version2.mintingHubV2OwnerTransfersV2s.items,
+			...(version1?.mintingHubV1OwnerTransfersV1s.items ?? []),
+			...(version2?.mintingHubV2OwnerTransfersV2s.items ?? []),
 		].sort((a, b) => a.created - b.created);
 
 		return {

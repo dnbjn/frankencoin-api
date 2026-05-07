@@ -1,6 +1,6 @@
 import { gql } from '@apollo/client/core';
 import { Injectable, Logger } from '@nestjs/common';
-import { PONDER_CLIENT } from 'app.config';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import {
 	LeadrateRateQuery,
 	LeadrateRateMapping,
@@ -20,6 +20,8 @@ export class SavingsLeadrateService {
 	private readonly logger = new Logger(this.constructor.name);
 	private fetchedRates: LeadrateRateMapping = {} as LeadrateRateMapping;
 	private fetchedProposals: LeadrateProposedMapping = {} as LeadrateProposedMapping;
+
+	constructor(private readonly dataSource: DataSourceManagerService) {}
 
 	getRates(): ApiLeadrateRate {
 		const chainIds = Object.keys(this.fetchedRates).map((id) => Number(id)) as ChainId[];
@@ -111,12 +113,11 @@ export class SavingsLeadrateService {
 
 	async updateLeadrateRates() {
 		this.logger.debug('Updating leadrate rates');
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			leadrateRateChangeds: {
 				items: LeadrateRateQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					leadrateRateChangeds(orderBy: "count", orderDirection: "DESC", limit: 1000) {
@@ -134,12 +135,12 @@ export class SavingsLeadrateService {
 			`,
 		});
 
-		if (!response.data || !response.data.leadrateRateChangeds?.items) {
+		if (!response || !response.leadrateRateChangeds?.items) {
 			this.logger.warn('No leadrateRateChangeds data found.');
 			return;
 		}
 
-		const d = response.data.leadrateRateChangeds.items;
+		const d = response.leadrateRateChangeds.items;
 
 		const list: LeadrateRateMapping = {} as LeadrateRateMapping;
 		for (const r of d) {
@@ -164,12 +165,11 @@ export class SavingsLeadrateService {
 
 	async updateLeadrateProposals() {
 		this.logger.debug('Updating leadrate proposals');
-		const response = await PONDER_CLIENT.query<{
+		const response = await this.dataSource.queryWithFailover<{
 			leadRateProposeds: {
 				items: LeadrateProposedQuery[];
 			};
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					leadRateProposeds(orderBy: "count", orderDirection: "DESC", limit: 1000) {
@@ -189,12 +189,12 @@ export class SavingsLeadrateService {
 			`,
 		});
 
-		if (!response.data || !response.data.leadRateProposeds?.items) {
+		if (!response || !response.leadRateProposeds?.items) {
 			this.logger.warn('No leadRateProposeds data found.');
 			return;
 		}
 
-		const d = response.data.leadRateProposeds.items;
+		const d = response.leadRateProposeds.items;
 
 		const list: LeadrateProposedMapping = {} as LeadrateProposedMapping;
 		for (const r of d) {

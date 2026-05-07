@@ -25,7 +25,6 @@ export interface QueryOptions {
 @Injectable()
 export class DataSourceManagerService {
 	private readonly logger = new Logger(DataSourceManagerService.name);
-	private currentSource: DataSource = 'primary';
 
 	constructor(private readonly indexerHealth: IndexerHealthService) {}
 
@@ -33,41 +32,44 @@ export class DataSourceManagerService {
 	 * Determine which data source to use
 	 */
 	determineSource(): DataSource {
-		this.currentSource = this.indexerHealth.determineDataSource();
-		return this.currentSource;
-	}
-
-	/**
-	 * Get current active data source
-	 */
-	getCurrentSource(): DataSource {
-		return this.currentSource;
+		return this.indexerHealth.determineDataSource();
 	}
 
 	/**
 	 * Query with automatic failover
-	 * Tries primary -> backup in order
+	 * Tries the preferred indexer first, then the other one. Returns null if both fail.
 	 */
 	async queryWithFailover<T = any>(options: QueryOptions): Promise<T | null> {
-		const source = this.determineSource();
+		const preferred = this.determineSource();
+		const order: DataSource[] =
+			preferred === 'backup' && PONDER_CLIENT_BACKUP
+				? ['backup', 'primary']
+				: PONDER_CLIENT_BACKUP
+					? ['primary', 'backup']
+					: ['primary'];
 
-		try {
-			// Try indexer (primary or backup)
-			if (source === 'primary') {
-				return await this.queryPrimary<T>(options);
-			} else {
-				return await this.queryBackup<T>(options);
+		let lastError: unknown;
+		for (const source of order) {
+			try {
+				return source === 'primary'
+					? await this.queryPrimary<T>(options)
+					: await this.queryBackup<T>(options);
+			} catch (err) {
+				lastError = err;
+				this.logger.warn(`Query failed on ${source}: ${err instanceof Error ? err.message : String(err)}`);
 			}
-		} catch (error) {
-			this.logger.error(`Query failed on ${source}`, error);
-			return null;
 		}
+
+		this.logger.error(
+			`Query failed on all indexers: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+		);
+		return null;
 	}
 
 	/**
 	 * Query primary indexer
 	 */
-	async queryPrimary<T = any>(options: QueryOptions): Promise<T> {
+	private async queryPrimary<T = any>(options: QueryOptions): Promise<T> {
 		this.logger.debug('Querying primary indexer');
 		const result = await PONDER_CLIENT.query({
 			query: options.query,
@@ -81,7 +83,7 @@ export class DataSourceManagerService {
 	/**
 	 * Query backup indexer
 	 */
-	async queryBackup<T = any>(options: QueryOptions): Promise<T> {
+	private async queryBackup<T = any>(options: QueryOptions): Promise<T> {
 		if (!PONDER_CLIENT_BACKUP) {
 			throw new Error('Backup indexer not configured');
 		}

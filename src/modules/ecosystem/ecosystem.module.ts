@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { DatabaseModule } from 'core/database/database.module';
+import { DataSourceModule } from 'core/data-source/data-source.module';
 import { PositionsModule } from 'modules/positions/positions.module';
 import { PricesModule } from 'modules/prices/prices.module';
 import { EcosystemCoinmarketcapController } from './ecosystem.coinmarketcap.controller';
@@ -13,7 +14,7 @@ import { EcosystemMinterController } from './ecosystem.minter.controller';
 import { EcosystemMinterService } from './ecosystem.minter.service';
 
 @Module({
-	imports: [DatabaseModule, PositionsModule, forwardRef(() => PricesModule)],
+	imports: [DataSourceModule, DatabaseModule, PositionsModule, forwardRef(() => PricesModule)],
 	controllers: [
 		EcosystemMinterController,
 		EcosystemCollateralController,

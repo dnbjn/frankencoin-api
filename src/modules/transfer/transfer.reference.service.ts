@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PONDER_CLIENT } from 'app.config';
 import { gql } from '@apollo/client/core';
+import { DataSourceManagerService } from 'core/data-source/data-source.manager.service';
 import { TransferReferenceObjectArray, TransferReferenceQuery } from './transfer.reference.types';
 import { Address } from 'viem';
 import { normalizeAddress } from 'utils/format';
@@ -9,6 +9,8 @@ import { normalizeAddress } from 'utils/format';
 export class TransferReferenceService {
 	private readonly logger = new Logger(this.constructor.name);
 	private fetchedReferences: TransferReferenceObjectArray = {};
+
+	constructor(private readonly dataSource: DataSourceManagerService) {}
 
 	getList() {
 		const m = Object.values(this.fetchedReferences);
@@ -23,10 +25,9 @@ export class TransferReferenceService {
 			const cachedItem = this.fetchedReferences[count];
 			if (cachedItem != undefined) return cachedItem;
 
-			const { data } = await PONDER_CLIENT.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				transferReferences: { items: TransferReferenceQuery[] };
 			}>({
-				fetchPolicy: 'cache-first',
 				query: gql`
 				query {
 					transferReferences(where: {count: "${count}" }, limit: 1) {
@@ -119,10 +120,9 @@ export class TransferReferenceService {
 			const startTimestamp = new Date(start ?? 0).getTime() / 1000;
 			const endTimestamp = end ? new Date(end).getTime() / 1000 : Date.now() / 1000;
 
-			const { data } = await PONDER_CLIENT.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				transferReferences: { items: TransferReferenceQuery[] };
 			}>({
-				fetchPolicy: 'cache-first',
 				query: gql`
 				query {
 					transferReferences(
@@ -150,7 +150,8 @@ export class TransferReferenceService {
 						}
 					}`,
 			});
-			return data.transferReferences.items;
+			if (!data) return [];
+			return data.transferReferences?.items ?? [];
 		} catch (error) {
 			console.error(error);
 			return { error };
@@ -170,10 +171,9 @@ export class TransferReferenceService {
 			const startTimestamp = new Date(start ?? 0).getTime() / 1000;
 			const endTimestamp = end ? new Date(end).getTime() / 1000 : Date.now() / 1000;
 
-			const { data } = await PONDER_CLIENT.query<{
+			const data = await this.dataSource.queryWithFailover<{
 				transferReferences: { items: TransferReferenceQuery[] };
 			}>({
-				fetchPolicy: 'cache-first',
 				query: gql`
 				query {
 					transferReferences(
@@ -201,7 +201,8 @@ export class TransferReferenceService {
 						}
 					}`,
 			});
-			return data.transferReferences.items;
+			if (!data) return [];
+			return data?.transferReferences?.items ?? [];
 		} catch (error) {
 			console.error(error);
 			return { error };
@@ -210,10 +211,9 @@ export class TransferReferenceService {
 
 	async updateReferences() {
 		this.logger.debug('Updating transfer references...');
-		const { data } = await PONDER_CLIENT.query<{
+		const data = await this.dataSource.queryWithFailover<{
 			transferReferences: { items: TransferReferenceQuery[] };
 		}>({
-			fetchPolicy: 'no-cache',
 			query: gql`
 				query {
 					transferReferences(orderBy: "count", limit: 1000) {

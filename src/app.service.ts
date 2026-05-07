@@ -101,7 +101,6 @@ export class ApiService {
 
 		// Determine which indexer to use
 		const currentSource = this.indexerHealth.determineDataSource();
-
 		// Get the active indexer status
 		const activeIndexer = currentSource === 'primary' ? primary : backup;
 
