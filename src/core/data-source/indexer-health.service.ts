@@ -32,7 +32,7 @@ export class IndexerHealthService {
 	/**
 	 * Check health of an indexer
 	 */
-	async checkIndexerHealth(indexerUrl: string, indexerType: 'primary' | 'backup'): Promise<IndexerStatus> {
+	private async checkIndexerHealth(indexerUrl: string, indexerType: 'primary' | 'backup'): Promise<IndexerStatus> {
 		const startTime = Date.now();
 		const status: IndexerStatus = {
 			url: indexerUrl,
