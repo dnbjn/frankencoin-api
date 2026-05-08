@@ -22,7 +22,7 @@ export class PonderProxyController {
 
 		for (const target of targets) {
 			try {
-				const upstream = await fetch(`${target.url}/graphql`, {
+				const upstream = await fetch(target.url, {
 					method: req.method,
 					headers: {
 						'Content-Type': 'application/json',
