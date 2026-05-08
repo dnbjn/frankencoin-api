@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CONFIG } from 'app.config';
+import { CONFIG, ponderAccessHeaders } from 'app.config';
 
 export interface IndexerStatus {
 	url: string;
@@ -49,7 +49,7 @@ export class IndexerHealthService {
 			// Fetch indexer status
 			const response = await fetch(`${indexerUrl}/status`, {
 				method: 'GET',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', ...ponderAccessHeaders() },
 				signal: AbortSignal.timeout(5000), // 5 second timeout
 			});
 

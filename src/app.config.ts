@@ -1,4 +1,4 @@
-import { ApolloClient, InMemoryCache } from '@apollo/client/core';
+import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client/core';
 import { http, createPublicClient, PublicClient } from 'viem';
 import { SupportedChainIds, ChainId } from '@frankencoin/zchf';
 import { arbitrum, avalanche, base, gnosis, mainnet, optimism, polygon, sonic } from 'viem/chains';
@@ -21,6 +21,8 @@ export type ConfigType = {
 	theGraphKey: string;
 	supportedChainIds: ChainId[];
 	databaseEnabled: boolean;
+	cfAccessClientId: string | null;
+	cfAccessClientSecret: string | null;
 };
 
 // Create config
@@ -33,18 +35,30 @@ export const CONFIG: ConfigType = {
 	theGraphKey: process.env.THE_GRAPH_KEY,
 	supportedChainIds: SupportedChainIds,
 	databaseEnabled: process.env.DISABLE_DATABASE !== 'true',
+	cfAccessClientId: process.env.CF_ACCESS_CLIENT_ID || null,
+	cfAccessClientSecret: process.env.CF_ACCESS_CLIENT_SECRET || null,
 };
+
+// Headers required to pass through Cloudflare Access in front of the indexer.
+// Returns an empty object when not configured, so local/dev setups without Access still work.
+export const ponderAccessHeaders = (): Record<string, string> =>
+	CONFIG.cfAccessClientId && CONFIG.cfAccessClientSecret
+		? {
+			'CF-Access-Client-Id': CONFIG.cfAccessClientId,
+			'CF-Access-Client-Secret': CONFIG.cfAccessClientSecret,
+		}
+		: {};
 
 // PONDER CLIENT REQUEST (Primary Indexer)
 export const PONDER_CLIENT = new ApolloClient({
-	uri: CONFIG.indexer,
+	link: createHttpLink({ uri: CONFIG.indexer, headers: ponderAccessHeaders() }),
 	cache: new InMemoryCache(),
 });
 
 // PONDER CLIENT BACKUP (Backup Indexer)
 export const PONDER_CLIENT_BACKUP = CONFIG.backupIndexer
 	? new ApolloClient({
-		uri: CONFIG.backupIndexer,
+		link: createHttpLink({ uri: CONFIG.backupIndexer }),
 		cache: new InMemoryCache(),
 	})
 	: null;
