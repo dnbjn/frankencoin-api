@@ -23,6 +23,9 @@ export interface IndexerStatus {
  */
 @Injectable()
 export class IndexerHealthService {
+	// Switch to backup when primary lags backup by more than this many blocks (stale-but-up).
+	private static readonly LAG_THRESHOLD = 100n;
+
 	private readonly logger = new Logger(IndexerHealthService.name);
 	private primaryHealth: IndexerStatus | null = null;
 	private backupHealth: IndexerStatus | null = null;
@@ -129,8 +132,18 @@ export class IndexerHealthService {
 		let logState: 'primary' | 'backup' | 'all-down';
 
 		if (this.primaryHealth?.isHealthy) {
-			source = 'primary';
-			logState = 'primary';
+			// Prefer backup when primary is significantly behind it (stale-but-up scenario)
+			if (
+				this.backupHealth?.isHealthy &&
+				CONFIG.backupIndexer &&
+				this.backupHealth.blockNumber - this.primaryHealth.blockNumber > IndexerHealthService.LAG_THRESHOLD
+			) {
+				source = 'backup';
+				logState = 'backup';
+			} else {
+				source = 'primary';
+				logState = 'primary';
+			}
 		} else if (this.backupHealth?.isHealthy && CONFIG.backupIndexer) {
 			source = 'backup';
 			logState = 'backup';
@@ -144,7 +157,7 @@ export class IndexerHealthService {
 		const haveCheckedAny = this.primaryHealth !== null || this.backupHealth !== null;
 		if (haveCheckedAny && logState !== this.lastLoggedSource) {
 			if (logState === 'backup') {
-				this.logger.warn('Primary indexer unhealthy, switching to backup indexer');
+				this.logger.warn('Primary indexer unhealthy or stale, switching to backup indexer');
 			} else if (logState === 'all-down') {
 				if (CONFIG.backupIndexer) {
 					this.logger.error('Both indexers unhealthy - will keep attempting primary');
