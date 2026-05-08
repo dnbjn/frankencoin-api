@@ -15,7 +15,11 @@ export class PonderProxyController {
 			...(CONFIG.backupIndexer ? [{ url: CONFIG.backupIndexer, isPrimary: false }] : []),
 		];
 
+		let lastStatus: number | null = null;
+		let lastBody: string | null = null;
+		let lastContentType: string | null = null;
 		let lastError: unknown;
+
 		for (const target of targets) {
 			try {
 				const upstream = await fetch(`${target.url}/graphql`, {
@@ -31,17 +35,35 @@ export class PonderProxyController {
 				});
 
 				const text = await upstream.text();
-				res.status(upstream.status);
-				const contentType = upstream.headers.get('content-type');
-				if (contentType) res.setHeader('Content-Type', contentType);
-				res.setHeader('Cache-Control', 'no-store');
-				return res.send(text);
+				lastStatus = upstream.status;
+				lastBody = text;
+				lastContentType = upstream.headers.get('content-type');
+
+				// Forward 2xx immediately; for any other status, fall through to next target
+				if (upstream.ok) {
+					res.status(upstream.status);
+					if (lastContentType) res.setHeader('Content-Type', lastContentType);
+					res.setHeader('Cache-Control', 'no-store');
+					return res.send(text);
+				}
+
+				this.logger.warn(
+					`GraphQL proxy got ${upstream.status} from ${target.url}, trying next target if available`
+				);
 			} catch (err) {
 				lastError = err;
 				this.logger.warn(
 					`GraphQL proxy failed against ${target.url}: ${err instanceof Error ? err.message : String(err)}`
 				);
 			}
+		}
+
+		// All targets exhausted — return the last upstream response if any (preserves error body for debugging)
+		if (lastStatus !== null && lastBody !== null) {
+			res.status(lastStatus);
+			if (lastContentType) res.setHeader('Content-Type', lastContentType);
+			res.setHeader('Cache-Control', 'no-store');
+			return res.send(lastBody);
 		}
 
 		throw new HttpException(
