@@ -1,4 +1,5 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client/core';
+import { setContext } from '@apollo/client/link/context';
 import { http, createPublicClient, PublicClient } from 'viem';
 import { SupportedChainIds, ChainId } from '@frankencoin/zchf';
 import { arbitrum, avalanche, base, gnosis, mainnet, optimism, polygon, sonic } from 'viem/chains';
@@ -49,9 +50,14 @@ export const ponderAccessHeaders = (): Record<string, string> =>
 		}
 		: {};
 
-// PONDER CLIENT REQUEST (Primary Indexer)
+// PONDER CLIENT REQUEST (Primary Indexer) — Cloudflare Access in front, inject service token via setContext
+const ponderAuthLink = setContext((_, { headers }) => ({
+	headers: { ...headers, ...ponderAccessHeaders() },
+}));
+const ponderHttpLink = createHttpLink({ uri: CONFIG.indexer });
+
 export const PONDER_CLIENT = new ApolloClient({
-	link: createHttpLink({ uri: CONFIG.indexer, headers: ponderAccessHeaders() }),
+	link: ponderAuthLink.concat(ponderHttpLink),
 	cache: new InMemoryCache(),
 });
 
