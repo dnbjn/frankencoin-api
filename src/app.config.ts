@@ -50,17 +50,6 @@ export const ponderAccessHeaders = (): Record<string, string> =>
 		}
 		: {};
 
-// One-shot boot diagnostic — prints whether CF Access env vars are present at module load.
-// Remove once verified.
-console.log('[boot] CF Access:', {
-	hasId: !!CONFIG.cfAccessClientId,
-	hasSecret: !!CONFIG.cfAccessClientSecret,
-	idLen: CONFIG.cfAccessClientId?.length ?? 0,
-	secretLen: CONFIG.cfAccessClientSecret?.length ?? 0,
-	rawIdEnv: !!process.env.CF_ACCESS_CLIENT_ID,
-	rawSecretEnv: !!process.env.CF_ACCESS_CLIENT_SECRET,
-});
-
 // PONDER CLIENT REQUEST (Primary Indexer) — Cloudflare Access in front, inject service token via setContext
 const ponderAuthLink = setContext((_, { headers }) => ({
 	headers: { ...headers, ...ponderAccessHeaders() },
