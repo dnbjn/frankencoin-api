@@ -55,10 +55,10 @@ export const PONDER_CLIENT = new ApolloClient({
 	cache: new InMemoryCache(),
 });
 
-// PONDER CLIENT BACKUP (Backup Indexer)
+// PONDER CLIENT BACKUP (Backup Indexer) — not behind Cloudflare Access, no auth headers
 export const PONDER_CLIENT_BACKUP = CONFIG.backupIndexer
 	? new ApolloClient({
-		link: createHttpLink({ uri: CONFIG.backupIndexer }),
+		uri: CONFIG.backupIndexer,
 		cache: new InMemoryCache(),
 	})
 	: null;

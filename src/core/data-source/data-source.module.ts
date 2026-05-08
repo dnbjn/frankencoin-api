@@ -3,6 +3,7 @@ import { IndexerHealthService } from './indexer-health.service';
 import { DataSourceManagerService } from './data-source.manager.service';
 import { StatusController } from './status.controller';
 import { StatusService } from './status.service';
+import { PonderProxyController } from './ponder-proxy.controller';
 
 /**
  * DataSourceModule - Provides indexer health monitoring and failover management
@@ -16,7 +17,7 @@ import { StatusService } from './status.service';
  * - StatusController: GET /status endpoint for system health
  */
 @Module({
-	controllers: [StatusController],
+	controllers: [StatusController, PonderProxyController],
 	providers: [IndexerHealthService, DataSourceManagerService, StatusService],
 	exports: [IndexerHealthService, DataSourceManagerService, StatusService],
 })

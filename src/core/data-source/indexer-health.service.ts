@@ -49,7 +49,10 @@ export class IndexerHealthService {
 			// Fetch indexer status
 			const response = await fetch(`${indexerUrl}/status`, {
 				method: 'GET',
-				headers: { 'Content-Type': 'application/json', ...ponderAccessHeaders() },
+				headers: {
+					'Content-Type': 'application/json',
+					...(indexerType === 'primary' ? ponderAccessHeaders() : {}),
+				},
 				signal: AbortSignal.timeout(5000), // 5 second timeout
 			});
 
