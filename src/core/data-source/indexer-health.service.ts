@@ -26,6 +26,7 @@ export class IndexerHealthService {
 	private readonly logger = new Logger(IndexerHealthService.name);
 	private primaryHealth: IndexerStatus | null = null;
 	private backupHealth: IndexerStatus | null = null;
+	private lastLoggedSource: 'primary' | 'backup' | 'all-down' | null = null;
 
 	constructor() {}
 
@@ -79,8 +80,15 @@ export class IndexerHealthService {
 			// Increment consecutive failures from previous state
 			const previousHealth = indexerType === 'primary' ? this.primaryHealth : this.backupHealth;
 			status.consecutiveFailures = (previousHealth?.consecutiveFailures || 0) + 1;
+		}
 
-			this.logger.warn(`Indexer ${indexerType} (${indexerUrl}) health check failed: ${status.error}`);
+		// Log only on state transition (healthy → unhealthy or unhealthy → healthy)
+		const previous = indexerType === 'primary' ? this.primaryHealth : this.backupHealth;
+		const wasHealthy = previous?.isHealthy ?? true;
+		if (wasHealthy && !status.isHealthy) {
+			this.logger.warn(`Indexer ${indexerType} (${indexerUrl}) became unhealthy: ${status.error}`);
+		} else if (!wasHealthy && status.isHealthy) {
+			this.logger.log(`Indexer ${indexerType} (${indexerUrl}) recovered`);
 		}
 
 		// Store in memory
@@ -114,20 +122,39 @@ export class IndexerHealthService {
 	 * Determine which data source to use based on health
 	 */
 	determineDataSource(): 'primary' | 'backup' {
-		// If primary is healthy, use it
+		let source: 'primary' | 'backup';
+		let logState: 'primary' | 'backup' | 'all-down';
+
 		if (this.primaryHealth?.isHealthy) {
-			return 'primary';
+			source = 'primary';
+			logState = 'primary';
+		} else if (this.backupHealth?.isHealthy && CONFIG.backupIndexer) {
+			source = 'backup';
+			logState = 'backup';
+		} else {
+			source = 'primary';
+			logState = 'all-down';
 		}
 
-		// If primary is down but backup is healthy, use backup
-		if (this.backupHealth?.isHealthy && CONFIG.backupIndexer) {
-			this.logger.warn('Primary indexer unhealthy, using backup indexer');
-			return 'backup';
+		// Suppress logging until at least one health check has completed,
+		// otherwise startup-phase queries would log "all indexers unhealthy" before any check ran.
+		const haveCheckedAny = this.primaryHealth !== null || this.backupHealth !== null;
+		if (haveCheckedAny && logState !== this.lastLoggedSource) {
+			if (logState === 'backup') {
+				this.logger.warn('Primary indexer unhealthy, switching to backup indexer');
+			} else if (logState === 'all-down') {
+				if (CONFIG.backupIndexer) {
+					this.logger.error('Both indexers unhealthy - will keep attempting primary');
+				} else {
+					this.logger.error('Primary indexer unhealthy and no backup configured - will keep attempting primary');
+				}
+			} else if (this.lastLoggedSource !== null) {
+				this.logger.log('Primary indexer healthy, switching back to primary');
+			}
+			this.lastLoggedSource = logState;
 		}
 
-		// Both indexers down - log error but keep trying primary
-		this.logger.error('Both indexers unhealthy - will keep attempting primary');
-		return 'primary';
+		return source;
 	}
 
 	/**

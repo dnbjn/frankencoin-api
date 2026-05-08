@@ -25,6 +25,7 @@ export interface QueryOptions {
 @Injectable()
 export class DataSourceManagerService {
 	private readonly logger = new Logger(DataSourceManagerService.name);
+	private lastServedSource: DataSource | null = null;
 
 	constructor(private readonly indexerHealth: IndexerHealthService) {}
 
@@ -51,9 +52,20 @@ export class DataSourceManagerService {
 		let lastError: unknown;
 		for (const source of order) {
 			try {
-				return source === 'primary'
-					? await this.queryPrimary<T>(options)
-					: await this.queryBackup<T>(options);
+				const result =
+					source === 'primary' ? await this.queryPrimary<T>(options) : await this.queryBackup<T>(options);
+
+				// Log on transition, and on the very first served query if it's not the primary.
+				if (this.lastServedSource === null) {
+					if (source !== 'primary') {
+						this.logger.warn(`Initial query served from ${source} indexer`);
+					}
+				} else if (this.lastServedSource !== source) {
+					this.logger.warn(`Query failover: now serving from ${source} (previously ${this.lastServedSource})`);
+				}
+				this.lastServedSource = source;
+
+				return result;
 			} catch (err) {
 				lastError = err;
 				this.logger.warn(`Query failed on ${source}: ${err instanceof Error ? err.message : String(err)}`);

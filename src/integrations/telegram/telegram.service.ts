@@ -156,7 +156,7 @@ export class TelegramService {
 	async sendMessage(group: string | number, message: string) {
 		if (!this.enabled) return;
 		try {
-			this.logger.log(`Sending message to group id: ${group}`);
+			this.logger.debug(`Sending message to group id: ${group}`);
 			await this.bot.sendMessage(group.toString(), message, { parse_mode: 'Markdown', disable_web_page_preview: true });
 		} catch (error) {
 			const msg = {

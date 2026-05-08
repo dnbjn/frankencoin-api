@@ -56,7 +56,7 @@ export class TransferReferenceService {
 				return item;
 			}
 		} catch (error) {
-			console.error(error);
+			this.logger.warn(`getByCount failed: ${error instanceof Error ? error.message : String(error)}`);
 			return undefined;
 		}
 	}
@@ -79,7 +79,7 @@ export class TransferReferenceService {
 
 			return filtered.filter((i) => i.created >= Math.round(startTimestamp) && i.created < Math.round(endTimestamp));
 		} catch (error) {
-			console.error(error);
+			this.logger.warn(`getByFromFilter failed: ${error instanceof Error ? error.message : String(error)}`);
 			return { error };
 		}
 	}
@@ -102,7 +102,7 @@ export class TransferReferenceService {
 
 			return filtered.filter((i) => i.created >= Math.round(startTimestamp) && i.created < Math.round(endTimestamp));
 		} catch (error) {
-			console.error(error);
+			this.logger.warn(`getByToFilter failed: ${error instanceof Error ? error.message : String(error)}`);
 			return { error };
 		}
 	}
@@ -153,7 +153,7 @@ export class TransferReferenceService {
 			if (!data) return [];
 			return data.transferReferences?.items ?? [];
 		} catch (error) {
-			console.error(error);
+			this.logger.warn(`getHistoryByFromFilter failed: ${error instanceof Error ? error.message : String(error)}`);
 			return { error };
 		}
 	}
@@ -204,7 +204,7 @@ export class TransferReferenceService {
 			if (!data) return [];
 			return data?.transferReferences?.items ?? [];
 		} catch (error) {
-			console.error(error);
+			this.logger.warn(`getHistoryByToFilter failed: ${error instanceof Error ? error.message : String(error)}`);
 			return { error };
 		}
 	}

@@ -35,10 +35,6 @@ export const CONFIG: ConfigType = {
 	databaseEnabled: process.env.DISABLE_DATABASE !== 'true',
 };
 
-// Start up message
-console.log(`Starting API with this config:`);
-console.log(CONFIG);
-
 // PONDER CLIENT REQUEST (Primary Indexer)
 export const PONDER_CLIENT = new ApolloClient({
 	uri: CONFIG.indexer,

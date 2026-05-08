@@ -64,7 +64,7 @@ export class ApiService {
 	}
 
 	async updateWorkflow() {
-		this.logger.log(`Fetching blockheight: ${this.fetchedBlockheight}`);
+		this.logger.debug(`Fetching blockheight: ${this.fetchedBlockheight}`);
 		const promises: Promise<any>[] = [];
 
 		if (this.guard('minters', 5 * MIN)) promises.push(this.minter.updateMinters());
