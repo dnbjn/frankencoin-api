@@ -1,4 +1,4 @@
-import { All, Body, Controller, HttpException, Logger, Post, Req, Res } from '@nestjs/common';
+import { All, Body, Controller, HttpException, Logger, Req, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { CONFIG, ponderAccessHeaders } from 'app.config';
@@ -26,6 +26,7 @@ export class PonderProxyController {
 						...(target.isPrimary ? ponderAccessHeaders() : {}),
 					},
 					body: req.method === 'GET' ? undefined : JSON.stringify(body ?? {}),
+					cache: 'no-store',
 					signal: AbortSignal.timeout(15000),
 				});
 
@@ -33,6 +34,7 @@ export class PonderProxyController {
 				res.status(upstream.status);
 				const contentType = upstream.headers.get('content-type');
 				if (contentType) res.setHeader('Content-Type', contentType);
+				res.setHeader('Cache-Control', 'no-store');
 				return res.send(text);
 			} catch (err) {
 				lastError = err;
