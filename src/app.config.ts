@@ -50,6 +50,27 @@ export const ponderAccessHeaders = (): Record<string, string> => {
 		: {};
 };
 
+// Validate the CF-Access pair at module load. Misconfiguration is silent at request time
+// (returns {} → primary 403s → all traffic falls to backup), so surface it loudly here.
+// We warn rather than throw because forks/local dev may legitimately not gate the indexer.
+{
+	const id = process.env.CF_ACCESS_CLIENT_ID;
+	const secret = process.env.CF_ACCESS_CLIENT_SECRET;
+	if ((id && !secret) || (!id && secret)) {
+		// eslint-disable-next-line no-console
+		console.warn(
+			'[CF-Access] Incomplete pair: only one of CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET is set. ' +
+				'Primary indexer will be rejected at Cloudflare Access. Set both, or unset both.'
+		);
+	} else if (!id && !secret) {
+		// eslint-disable-next-line no-console
+		console.warn(
+			'[CF-Access] CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET not set. ' +
+				`If primary indexer (${CONFIG.indexer}) sits behind Cloudflare Access, all primary requests will 403.`
+		);
+	}
+}
+
 // PONDER CLIENT REQUEST (Primary Indexer) — Cloudflare Access in front, inject service token via setContext
 const ponderAuthLink = setContext((_, { headers }) => ({
 	headers: { ...headers, ...ponderAccessHeaders() },

@@ -401,14 +401,14 @@ export class PricesService {
 
 		// make chf conversion available
 		const frankencoin = normalizeAddress(ADDRESS[mainnet.id].frankencoin);
-		const zchfPrice = this.fetchedPrices[frankencoin].price.usd;
+		const zchfPrice = this.fetchedPrices[frankencoin]?.price?.usd;
 		for (const addr of Object.keys(this.fetchedPrices)) {
 			// break out if zchf price is not available
 			if (zchfPrice == undefined) break;
 
 			// calculate chf value for erc token
 			if (this.fetchedPrices[addr]?.timestamp > 0) {
-				const priceUsd = this.fetchedPrices[addr].price.usd;
+				const priceUsd = this.fetchedPrices[addr]?.price?.usd;
 				if (priceUsd == undefined) continue;
 				const priceChf = Math.floor((priceUsd / zchfPrice) * 10000) / 10000;
 				this.fetchedPrices[addr].price.chf = addr === frankencoin ? 1 : priceChf;

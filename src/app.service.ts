@@ -17,7 +17,8 @@ import { mainnet } from 'viem/chains';
 
 export const INDEXING_TIMEOUT_COUNT: number = 3;
 export const POLLING_DELAY: number = 6_000; // e.g. 6000ms (= 6sec)
-export const BLOCK_HEIGHT_TOLERANCE: number = 2; // Allow indexer to be up to 2 blocks behind
+// Note: per-source staleness now lives in IndexerHealthService.STALE_BLOCKS — a single
+// chain-head-relative threshold drives both the failover decision and the workflow gate.
 
 export type IndexerStatus = {
 	id: ChainId;
@@ -94,10 +95,12 @@ export class ApiService {
 	@Interval(POLLING_DELAY)
 	async updateBlockheight() {
 		// Get blockchain block height
-		const blockHeight: number = parseInt((await VIEM_CONFIG[mainnet.id].getBlockNumber()).toString());
+		const chainHead: bigint = await VIEM_CONFIG[mainnet.id].getBlockNumber();
+		const blockHeight: number = Number(chainHead);
 
-		// Check health of both indexers
-		const { primary, backup } = await this.indexerHealth.checkBothIndexers();
+		// Check health of both indexers against chain head — staleness is determined inside
+		// the health service using a single chain-head-relative threshold.
+		const { primary, backup } = await this.indexerHealth.checkBothIndexers(chainHead);
 
 		// Determine which indexer to use
 		const currentSource = this.indexerHealth.determineDataSource();
@@ -106,17 +109,7 @@ export class ApiService {
 
 		if (!activeIndexer || !activeIndexer.isHealthy) {
 			this.logger.warn(
-				`No healthy indexer available${primary?.error ? ` Primary error: ${primary.error}` : ''}${backup?.error ? ` Backup error: ${backup.error}` : ''}`
-			);
-			return;
-		}
-
-		// Check if indexer is caught up with blockchain (with tolerance)
-		const indexerBlockNumber = Number(activeIndexer.blockNumber);
-		const blockDifference = blockHeight - indexerBlockNumber;
-		if (blockDifference > BLOCK_HEIGHT_TOLERANCE) {
-			this.logger.warn(
-				`Indexer is not ready (blockchain: ${blockHeight}, indexer: ${indexerBlockNumber}, lag: ${blockDifference} blocks)`
+				`No fresh indexer available${primary?.error ? ` — primary: ${primary.error}` : ''}${backup?.error ? ` — backup: ${backup.error}` : ''}`
 			);
 			return;
 		}

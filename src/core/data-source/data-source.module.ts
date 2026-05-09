@@ -10,7 +10,7 @@ import { PonderProxyController } from './ponder-proxy.controller';
  *
  * Exports:
  * - IndexerHealthService: Monitors primary/backup indexer health
- * - DataSourceManagerService: Manages three-tier failover (primary -> backup -> cache)
+ * - DataSourceManagerService: Manages three-tier failover (primary -> backup)
  * - StatusService: Provides system status information
  *
  * Controllers:

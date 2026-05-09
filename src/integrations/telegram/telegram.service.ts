@@ -36,8 +36,8 @@ import { PositionDeniedMessage } from './messages/PositionDenied.message';
 export class TelegramService {
 	private readonly startUpTime = Date.now();
 	private readonly logger = new Logger(this.constructor.name);
-	private readonly enabled = !!process.env.TELEGRAM_BOT_TOKEN;
-	private readonly bot = this.enabled ? new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true }) : null;
+	private enabled = !!process.env.TELEGRAM_BOT_TOKEN;
+	private bot: TelegramBot | null = null;
 	private telegramHandles: string[] = ['/MintingUpdates', '/PriceAlerts', '/DailyInfos', '/help'];
 	private telegramState: TelegramState;
 	private telegramGroupState: TelegramGroupState;
@@ -54,6 +54,29 @@ export class TelegramService {
 	) {
 		if (!this.enabled) {
 			this.logger.warn('TELEGRAM_BOT_TOKEN not set — Telegram integration disabled');
+		} else {
+			try {
+				this.bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+				// Attach error handlers BEFORE polling has a chance to fail. node-telegram-bot-api
+				// emits these whenever the polling loop or any internal request errors out
+				// (invalid token → 401, network blips, Telegram outages). Without listeners,
+				// 'polling_error' becomes an unhandled error and can crash the process.
+				this.bot.on('polling_error', (err) => {
+					this.logger.warn(`Telegram polling_error: ${err instanceof Error ? err.message : String(err)}`);
+				});
+				this.bot.on('error', (err) => {
+					this.logger.warn(`Telegram bot error: ${err instanceof Error ? err.message : String(err)}`);
+				});
+				this.bot.on('webhook_error', (err) => {
+					this.logger.warn(`Telegram webhook_error: ${err instanceof Error ? err.message : String(err)}`);
+				});
+			} catch (err) {
+				this.logger.error(
+					`Failed to initialize Telegram bot, disabling integration: ${err instanceof Error ? err.message : String(err)}`
+				);
+				this.bot = null;
+				this.enabled = false;
+			}
 		}
 
 		this.telegramState = {
