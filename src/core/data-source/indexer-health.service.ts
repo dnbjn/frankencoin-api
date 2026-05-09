@@ -58,12 +58,16 @@ export class IndexerHealthService {
 		};
 
 		try {
-			// Fetch indexer status
+			// Fetch indexer status. Set an explicit User-Agent — Cloudflare's WAF / Bot
+			// Management runs *before* CF-Access and will 403 requests from datacenter IPs
+			// that present Node's default `undici/x.y.z` UA, before the access token is even
+			// evaluated. Sending a recognizable service UA avoids the bot-score block.
 			const accessHeaders = indexerType === 'primary' ? ponderAccessHeaders() : {};
 			const response = await fetch(`${indexerUrl}/status`, {
 				method: 'GET',
 				headers: {
 					'Content-Type': 'application/json',
+					'User-Agent': 'frankencoin-api-healthcheck/1.0',
 					...accessHeaders,
 				},
 				signal: AbortSignal.timeout(5000), // 5 second timeout
