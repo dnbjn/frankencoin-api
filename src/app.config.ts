@@ -22,8 +22,6 @@ export type ConfigType = {
 	theGraphKey: string;
 	supportedChainIds: ChainId[];
 	databaseEnabled: boolean;
-	cfAccessClientId: string | null;
-	cfAccessClientSecret: string | null;
 };
 
 // Create config
@@ -36,19 +34,21 @@ export const CONFIG: ConfigType = {
 	theGraphKey: process.env.THE_GRAPH_KEY,
 	supportedChainIds: SupportedChainIds,
 	databaseEnabled: process.env.DISABLE_DATABASE !== 'true',
-	cfAccessClientId: process.env.CF_ACCESS_CLIENT_ID || null,
-	cfAccessClientSecret: process.env.CF_ACCESS_CLIENT_SECRET || null,
 };
 
 // Headers required to pass through Cloudflare Access in front of the indexer.
-// Returns an empty object when not configured, so local/dev setups without Access still work.
-export const ponderAccessHeaders = (): Record<string, string> =>
-	CONFIG.cfAccessClientId && CONFIG.cfAccessClientSecret
+// Reads directly from process.env on every call so it always reflects the current
+// runtime environment, not whatever CONFIG captured at module load.
+export const ponderAccessHeaders = (): Record<string, string> => {
+	const id = process.env.CF_ACCESS_CLIENT_ID;
+	const secret = process.env.CF_ACCESS_CLIENT_SECRET;
+	return id && secret
 		? {
-			'CF-Access-Client-Id': CONFIG.cfAccessClientId,
-			'CF-Access-Client-Secret': CONFIG.cfAccessClientSecret,
+			'CF-Access-Client-Id': id,
+			'CF-Access-Client-Secret': secret,
 		}
 		: {};
+};
 
 // PONDER CLIENT REQUEST (Primary Indexer) — Cloudflare Access in front, inject service token via setContext
 const ponderAuthLink = setContext((_, { headers }) => ({

@@ -50,11 +50,18 @@ export class IndexerHealthService {
 
 		try {
 			// Fetch indexer status
+			const accessHeaders = indexerType === 'primary' ? ponderAccessHeaders() : {};
+			if (indexerType === 'primary') {
+				const id = accessHeaders['CF-Access-Client-Id'];
+				this.logger.log(
+					`[diag] primary access headers at fetch: hasId=${!!id} idLen=${id?.length ?? 0} envIdSet=${!!process.env.CF_ACCESS_CLIENT_ID}`
+				);
+			}
 			const response = await fetch(`${indexerUrl}/status`, {
 				method: 'GET',
 				headers: {
 					'Content-Type': 'application/json',
-					...(indexerType === 'primary' ? ponderAccessHeaders() : {}),
+					...accessHeaders,
 				},
 				signal: AbortSignal.timeout(5000), // 5 second timeout
 			});

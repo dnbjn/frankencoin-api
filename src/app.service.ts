@@ -105,7 +105,9 @@ export class ApiService {
 		const activeIndexer = currentSource === 'primary' ? primary : backup;
 
 		if (!activeIndexer || !activeIndexer.isHealthy) {
-			this.logger.warn('No healthy indexer available');
+			this.logger.warn(
+				`No healthy indexer available${primary?.error ? ` Primary error: ${primary.error}` : ''}${backup?.error ? ` Backup error: ${backup.error}` : ''}`
+			);
 			return;
 		}
 
