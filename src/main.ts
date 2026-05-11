@@ -7,7 +7,10 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 async function bootstrap() {
 	const api = await NestFactory.create(AppModule, {
 		logger: ['log', 'warn', 'error'],
-		cors: true,
+	});
+
+	api.enableCors({
+		origin: ['https://zchf.app'],
 	});
 
 	// Global exception filter — standardised JSON error shape
@@ -27,8 +30,8 @@ async function bootstrap() {
 		.setTitle(process.env.npm_package_name)
 		.setDescription(
 			'REST API for the Frankencoin ecosystem providing real-time and historical data for the ZCHF stablecoin operations. ' +
-				'Access ecosystem metrics, collateral positions, minter data, savings rates, price feeds, challenges, and analytics. ' +
-				'TypeScript types and client utilities are available via the @frankencoin/api npm package.'
+			'Access ecosystem metrics, collateral positions, minter data, savings rates, price feeds, challenges, and analytics. ' +
+			'TypeScript types and client utilities are available via the @frankencoin/api npm package.'
 		)
 		.setVersion(process.env.npm_package_version)
 		.build();
