@@ -26,7 +26,7 @@ export class IndexerHealthService {
 	// An indexer is "stale" if its latest indexed block is more than this many blocks
 	// behind chain head. ~60s on mainnet — generous enough to absorb RPC/indexer poll skew,
 	// tight enough that we don't serve hours-old data while a fresh source is available.
-	private static readonly STALE_BLOCKS = 5n;
+	private static readonly STALE_BLOCKS = 10n;
 
 	private readonly logger = new Logger(IndexerHealthService.name);
 	private primaryHealth: IndexerStatus | null = null;
