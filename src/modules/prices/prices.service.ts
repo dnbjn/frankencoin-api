@@ -31,6 +31,9 @@ import { ContractBlacklist, ContractWhitelist } from './prices.mgm';
 import { getChain } from 'utils/func-helper';
 import { normalizeAddress } from 'utils/format';
 
+type PriceSourceResult = { price: PriceQueryCurrencies; source: PriceSource };
+type PriceSourceResultMapping = Record<Address, PriceSourceResult>;
+
 @Injectable()
 export class PricesService {
 	private readonly logger = new Logger(this.constructor.name);
@@ -165,9 +168,18 @@ export class PricesService {
 	}
 
 	async fetchPriceTheGraph(erc: ERC20Info): Promise<PriceQueryCurrencies | null> {
+		const result = await this.fetchPricesTheGraph([erc]);
+		return result[normalizeAddress(erc.address)]?.price || null;
+	}
+
+	async fetchPricesTheGraph(ercs: ERC20Info[]): Promise<PriceSourceResultMapping> {
+		if (ercs.length === 0) return {};
+
 		const url = `https://gateway.thegraph.com/api/subgraphs/id/6PRcMNb9RCczH7aAnWvbw7pHgPWmziVsYjwgUFBeE3mR`;
+		const ids = ercs.map((erc) => normalizeAddress(erc.address));
 		const query = `{
-			token(id: "${normalizeAddress(erc.address)}") {
+			tokens(where: { id_in: ${JSON.stringify(ids)} }) {
+				id
 				priceUSD
 				priceCHF
 			}
@@ -189,96 +201,168 @@ export class PricesService {
 			if (data?.errors) {
 				const errorMsg = data.errors[0]?.message || 'Unknown error';
 				if (errorMsg.includes('bad indexers') || errorMsg.includes('Unavailable')) {
-					this.logger.warn(`The Graph indexer unavailable for ${erc.symbol}, skipping...`);
+					this.logger.warn(`The Graph indexer unavailable for ${ercs.length} token(s), skipping...`);
 				} else {
-					this.logger.debug(`The Graph error for ${erc.symbol}: ${errorMsg}`);
+					this.logger.debug(`The Graph error: ${errorMsg}`);
 				}
-				return null;
+				return {};
 			}
 
-			const token = data?.data?.token;
-			if (!token?.priceUSD) return null;
+			const prices: PriceSourceResultMapping = {};
+			for (const token of data?.data?.tokens || []) {
+				if (!token?.id || !token?.priceUSD) continue;
 
-			const usd = parseFloat(token.priceUSD);
-			const chf = parseFloat(token.priceCHF);
-			return chf > 0 ? { usd, chf } : { usd };
+				const usd = parseFloat(token.priceUSD);
+				const chf = parseFloat(token.priceCHF);
+				const addr = normalizeAddress(token.id);
+				prices[addr] = {
+					price: chf > 0 ? { usd, chf } : { usd },
+					source: 'thegraph',
+				};
+			}
+			return prices;
 		} catch (error) {
 			this.logger.error(`Error fetching price from The Graph: ${error}`);
-			return null;
+			return {};
 		}
 	}
 
 	async fetchPriceDefillama(erc: ERC20Info): Promise<PriceQueryCurrencies | null> {
-		const chain = getChain(erc.chainId) as SupportedChain;
-		const chainName = chain.id === mainnet.id ? 'ethereum' : chain.name;
-		const url = `https://coins.llama.fi/prices/current/${chainName}:${normalizeAddress(erc.address)}`;
+		const result = await this.fetchPricesDefillama([erc]);
+		return result[normalizeAddress(erc.address)]?.price || null;
+	}
+
+	async fetchPricesDefillama(ercs: ERC20Info[]): Promise<PriceSourceResultMapping> {
+		const coinToAddress: Record<string, Address> = {};
+		const coins = ercs.map((erc) => {
+			const coin = this.getDefillamaCoinKey(erc);
+			coinToAddress[coin] = normalizeAddress(erc.address);
+			return coin;
+		});
+		if (coins.length === 0) return {};
+
+		const url = `https://coins.llama.fi/prices/current/${coins.join(',')}`;
 
 		try {
 			const response = await fetch(url);
 			const data = await response.json();
-			const coin = data?.coins?.[`${chainName}:${normalizeAddress(erc.address)}`];
-			if (!coin?.price) return null;
+			const prices: PriceSourceResultMapping = {};
 
-			return { usd: Number(coin.price) };
+			for (const [coinKey, coin] of Object.entries(data?.coins || {})) {
+				const price = (coin as { price?: number })?.price;
+				const addr = coinToAddress[coinKey];
+				if (!addr || !price) continue;
+
+				prices[addr] = {
+					price: { usd: Number(price) },
+					source: 'defillama',
+				};
+			}
+
+			return prices;
 		} catch (error) {
 			this.logger.error(`Error fetching price from DefiLlama: ${error}`);
-			return null;
+			return {};
 		}
 	}
 
-	async fetchPriceCoingecko(erc: ERC20Info): Promise<PriceQueryCurrencies | null> {
-		const url = `/api/v3/simple/token_price/ethereum?contract_addresses=${erc.address}&vs_currencies=usd`;
+	getDefillamaCoinKey(erc: ERC20Info): string {
+		const chain = getChain(erc.chainId) as SupportedChain;
+		const chainName = chain.id === mainnet.id ? 'ethereum' : chain.name;
+		return `${chainName}:${normalizeAddress(erc.address)}`;
+	}
 
-		// ignore tokens
-		switch (normalizeAddress(erc.address)) {
-			case normalizeAddress('0x553C7f9C780316FC1D34b8e14ac2465Ab22a090B'): // REALU
-			case normalizeAddress('0x2E880962A9609aA3eab4DEF919FE9E917E99073B'): // BOSS
-			case normalizeAddress('0x8747a3114Ef7f0eEBd3eB337F745E31dBF81a952'): // DQTS
-			case normalizeAddress('0x343324F53CBEEE3Ee6d171f2a20F005964C98047'): // LENDS
-				return null;
-		}
+	async fetchPriceCoingecko(erc: ERC20Info): Promise<PriceQueryCurrencies | null> {
+		const result = await this.fetchPricesCoingecko([erc]);
+		return result[normalizeAddress(erc.address)]?.price || null;
+	}
+
+	async fetchPricesCoingecko(ercs: ERC20Info[]): Promise<PriceSourceResultMapping> {
+		const addresses = ercs.map((erc) => normalizeAddress(erc.address)).filter((address) => !this.isCoingeckoIgnored(address));
+
+		if (addresses.length === 0) return {};
+
+		const url = `/api/v3/simple/token_price/ethereum?contract_addresses=${addresses.join(',')}&vs_currencies=usd`;
 
 		try {
 			const data = await (await COINGECKO_CLIENT(url)).json();
 			if (data.status) {
 				this.logger.debug(data.status?.error_message || 'Error fetching price from CoinGecko');
-				return null;
+				return {};
 			}
 
-			const priceData = Object.values(data)[0] as { usd?: number } | undefined;
-			if (!priceData?.usd || priceData.usd === 0) return null;
+			const prices: PriceSourceResultMapping = {};
+			for (const [address, priceData] of Object.entries(data)) {
+				const usd = (priceData as { usd?: number })?.usd;
+				if (!usd || usd === 0) continue;
 
-			return { usd: priceData.usd };
+				prices[normalizeAddress(address)] = {
+					price: { usd },
+					source: 'coingecko',
+				};
+			}
+
+			return prices;
 		} catch (error) {
 			this.logger.error(`Error fetching price from CoinGecko: ${error}`);
-			return null;
+			return {};
 		}
 	}
 
-	async fetchPriceSources(erc: ERC20Info): Promise<{ price: PriceQueryCurrencies; source: PriceSource } | null> {
+	isCoingeckoIgnored(address: Address): boolean {
+		switch (normalizeAddress(address)) {
+			case normalizeAddress('0x553C7f9C780316FC1D34b8e14ac2465Ab22a090B'): // REALU
+			case normalizeAddress('0x2E880962A9609aA3eab4DEF919FE9E917E99073B'): // BOSS
+			case normalizeAddress('0x8747a3114Ef7f0eEBd3eB337F745E31dBF81a952'): // DQTS
+			case normalizeAddress('0x343324F53CBEEE3Ee6d171f2a20F005964C98047'): // LENDS
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	async fetchPriceSources(erc: ERC20Info): Promise<PriceSourceResult | null> {
+		const result = await this.fetchPriceSourcesBatch([erc]);
+		return result[normalizeAddress(erc.address)] || null;
+	}
+
+	async fetchPriceSourcesBatch(ercs: ERC20Info[]): Promise<PriceSourceResultMapping> {
+		const prices: PriceSourceResultMapping = {};
+		const skipFallback = new Set<Address>();
+
 		// Priority 1: Custom overwrite (e.g., Frankencoin Pool Share)
-		if (normalizeAddress(erc.address) === normalizeAddress(ADDRESS[mainnet.id].equity)) {
+		for (const erc of ercs) {
+			const addr = normalizeAddress(erc.address);
+			if (addr !== normalizeAddress(ADDRESS[mainnet.id].equity)) continue;
+			skipFallback.add(addr);
+
 			const priceInChf = this.fps.getEcosystemFpsInfo()?.token?.price;
 			const zchfAddress = normalizeAddress(ADDRESS[mainnet.id].frankencoin);
 			const zchfPrice: number = this.fetchedPrices[zchfAddress]?.price?.usd;
-			if (!zchfPrice || !priceInChf) return null;
-			return { price: { usd: priceInChf * zchfPrice }, source: 'custom' };
+			if (!zchfPrice || !priceInChf) continue;
+
+			prices[addr] = {
+				price: { usd: priceInChf * zchfPrice },
+				source: 'custom',
+			};
 		}
 
+		const getMissing = () =>
+			ercs.filter((erc) => {
+				const addr = normalizeAddress(erc.address);
+				return prices[addr] == undefined && !skipFallback.has(addr);
+			});
+
 		// Priority: DeFiLlama
-		const defillamaPrice = await this.fetchPriceDefillama(erc);
-		if (defillamaPrice) return { price: defillamaPrice, source: 'defillama' };
+		Object.assign(prices, await this.fetchPricesDefillama(getMissing()));
 
 		// Priority: The Graph
-		const thegraphPrice = await this.fetchPriceTheGraph(erc);
-		if (thegraphPrice) return { price: thegraphPrice, source: 'thegraph' };
+		Object.assign(prices, await this.fetchPricesTheGraph(getMissing()));
 
 		// Priority: CoinGecko
-		const coingeckoPrice = await this.fetchPriceCoingecko(erc);
-		if (coingeckoPrice) return { price: coingeckoPrice, source: 'coingecko' };
+		Object.assign(prices, await this.fetchPricesCoingecko(getMissing()));
 
-		// No price found from any source
-		return null;
+		return prices;
 	}
 
 	async getOwnerValueLocked(owner: Address): Promise<ApiOwnerValueLocked> {
@@ -341,6 +425,8 @@ export class PricesService {
 		const a = [fps, m, ...c];
 
 		const pricesQuery: PriceQueryObjectArray = {};
+		const pricesToFetch: ERC20Info[] = [];
+		const priceFetchMode: Record<Address, 'new' | 'update'> = {};
 		let pricesQueryNewCount: number = 0;
 		let pricesQueryNewCountFailed: number = 0;
 		let pricesQueryUpdateCount: number = 0;
@@ -353,7 +439,29 @@ export class PricesService {
 			if (!oldEntry) {
 				pricesQueryNewCount += 1;
 				this.logger.debug(`Price for ${erc.name} not available, trying to fetch`);
-				const result = await this.fetchPriceSources(erc);
+				priceFetchMode[addr] = 'new';
+				pricesToFetch.push(erc);
+			} else if (oldEntry.timestamp + 300_000 < Date.now()) {
+				// needs to update => try to fetch
+				pricesQueryUpdateCount += 1;
+				this.logger.debug(`Price for ${erc.name} out of date, trying to fetch`);
+				priceFetchMode[addr] = 'update';
+				pricesToFetch.push(erc);
+			}
+		}
+
+		const fetchedSourcePrices = await this.fetchPriceSourcesBatch(pricesToFetch);
+		this.logger.debug(
+			`Fetched ${Object.keys(fetchedSourcePrices).length}/${pricesToFetch.length} prices: ${Object.entries(fetchedSourcePrices)
+				.map(([address, result]) => `${address}=${result.source}:${JSON.stringify(result.price)}`)
+				.join(', ')}`
+		);
+
+		for (const erc of pricesToFetch) {
+			const addr = normalizeAddress(erc.address);
+			const result = fetchedSourcePrices[addr] || null;
+
+			if (priceFetchMode[addr] === 'new') {
 				if (result == null) pricesQueryNewCountFailed += 1;
 
 				pricesQuery[addr] = {
@@ -362,12 +470,8 @@ export class PricesService {
 					timestamp: result === null ? 0 : Date.now(),
 					price: result === null ? { usd: 0, chf: 0 } : result.price,
 				};
-			} else if (oldEntry.timestamp + 300_000 < Date.now()) {
-				// needs to update => try to fetch
-				pricesQueryUpdateCount += 1;
-				this.logger.debug(`Price for ${erc.name} out of date, trying to fetch`);
-				const result = await this.fetchPriceSources(erc);
-
+			} else if (priceFetchMode[addr] === 'update') {
+				const oldEntry = this.fetchedPrices[addr];
 				if (result == null) {
 					pricesQueryUpdateCountFailed += 1;
 				} else {
@@ -414,6 +518,8 @@ export class PricesService {
 				this.fetchedPrices[addr].price.chf = addr === frankencoin ? 1 : priceChf;
 			}
 		}
+
+		this.logger.debug(`Fetched prices state: ${JSON.stringify(this.fetchedPrices)}`);
 	}
 
 	@Cron(CronExpression.EVERY_10_MINUTES)
