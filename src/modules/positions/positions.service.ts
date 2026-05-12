@@ -41,6 +41,10 @@ export class PositionsService {
 
 	constructor(private readonly dataSource: DataSourceManagerService) {}
 
+	private shouldRefreshPosition(position: Pick<PositionQuery, 'closed' | 'denied' | 'collateralBalance'>): boolean {
+		return !position.closed && !position.denied && BigInt(position.collateralBalance) > 0n;
+	}
+
 	getPositionsList(): ApiPositionsListing {
 		const pos = Object.values(this.fetchedPositions) as PositionQuery[];
 		return {
@@ -160,41 +164,49 @@ export class PositionsService {
 				return;
 			}
 
-			const items: PositionQuery[] = data.mintingHubV1PositionV1s.items as PositionQueryV1[];
+			const items: PositionQueryV1[] = data.mintingHubV1PositionV1s.items as PositionQueryV1[];
 			const list: PositionsQueryObjectArray = {};
 			const balanceOfDataPromises: Promise<bigint>[] = [];
 			const mintedDataPromises: Promise<bigint>[] = [];
 			const availableForClonesDataPromises: Promise<bigint>[] = [];
 
 			for (const p of items) {
+				const shouldRefresh = this.shouldRefreshPosition(p);
+
 				// Forces the collateral balance to be overwritten with the latest blockchain state, instead of the ponder state.
 				// This ensures that collateral transfers can be made without using the smart contract or application directly,
 				// and the API will be aware of the updated state.
 				balanceOfDataPromises.push(
-					VIEM_CONFIG[mainnet.id].readContract({
-						address: p.collateral,
-						abi: erc20Abi,
-						functionName: 'balanceOf',
-						args: [p.position],
-					})
+					shouldRefresh
+						? VIEM_CONFIG[mainnet.id].readContract({
+							address: p.collateral,
+							abi: erc20Abi,
+							functionName: 'balanceOf',
+							args: [p.position],
+						})
+						: Promise.resolve(BigInt(p.collateralBalance))
 				);
 
 				// fetch minted - See issue #11
 				// https://github.com/Frankencoin-ZCHF/frankencoin-api/issues/11
 				mintedDataPromises.push(
-					VIEM_CONFIG[mainnet.id].readContract({
-						address: p.position,
-						abi: PositionV1ABI,
-						functionName: 'minted',
-					})
+					shouldRefresh
+						? VIEM_CONFIG[mainnet.id].readContract({
+							address: p.position,
+							abi: PositionV1ABI,
+							functionName: 'minted',
+						})
+						: Promise.resolve(BigInt(p.minted))
 				);
 
 				availableForClonesDataPromises.push(
-					VIEM_CONFIG[mainnet.id].readContract({
-						address: p.position,
-						abi: PositionV1ABI,
-						functionName: 'limitForClones',
-					})
+					shouldRefresh
+						? VIEM_CONFIG[mainnet.id].readContract({
+							address: p.position,
+							abi: PositionV1ABI,
+							functionName: 'limitForClones',
+						})
+						: Promise.resolve(BigInt(p.availableForClones))
 				);
 			}
 
@@ -328,7 +340,7 @@ export class PositionsService {
 				return;
 			}
 
-			const items: PositionQuery[] = data.mintingHubV2PositionV2s.items as PositionQueryV2[];
+			const items: PositionQueryV2[] = data.mintingHubV2PositionV2s.items as PositionQueryV2[];
 			const list: PositionsQueryObjectArray = {};
 			const balanceOfDataPromises: Promise<bigint>[] = [];
 			const mintedDataPromises: Promise<bigint>[] = [];
@@ -342,43 +354,53 @@ export class PositionsService {
 			});
 
 			for (const p of items) {
+				const shouldRefresh = this.shouldRefreshPosition(p);
+
 				// Forces the collateral balance to be overwritten with the latest blockchain state, instead of the ponder state.
 				// This ensures that collateral transfers can be made without using the smart contract or application directly,
 				// and the API will be aware of the updated state.
 				balanceOfDataPromises.push(
-					VIEM_CONFIG[mainnet.id].readContract({
-						address: p.collateral,
-						abi: erc20Abi,
-						functionName: 'balanceOf',
-						args: [p.position],
-					})
+					shouldRefresh
+						? VIEM_CONFIG[mainnet.id].readContract({
+							address: p.collateral,
+							abi: erc20Abi,
+							functionName: 'balanceOf',
+							args: [p.position],
+						})
+						: Promise.resolve(BigInt(p.collateralBalance))
 				);
 
 				// fetch minted - See issue #11
 				// https://github.com/Frankencoin-ZCHF/frankencoin-api/issues/11
 				mintedDataPromises.push(
-					VIEM_CONFIG[mainnet.id].readContract({
-						address: p.position,
-						abi: PositionV2ABI,
-						functionName: 'minted',
-					})
+					shouldRefresh
+						? VIEM_CONFIG[mainnet.id].readContract({
+							address: p.position,
+							abi: PositionV2ABI,
+							functionName: 'minted',
+						})
+						: Promise.resolve(BigInt(p.minted))
 				);
 
 				// make highly available, instead of relying on indexer state
 				// https://github.com/Frankencoin-ZCHF/frankencoin-dapp/issues/144
 				availableForClonesDataPromises.push(
-					VIEM_CONFIG[mainnet.id].readContract({
-						address: p.original,
-						abi: PositionV2ABI,
-						functionName: 'availableForClones',
-					})
+					shouldRefresh
+						? VIEM_CONFIG[mainnet.id].readContract({
+							address: p.original,
+							abi: PositionV2ABI,
+							functionName: 'availableForClones',
+						})
+						: Promise.resolve(BigInt(p.availableForClones))
 				);
 				availableForMintingDataPromises.push(
-					VIEM_CONFIG[mainnet.id].readContract({
-						address: p.position,
-						abi: PositionV2ABI,
-						functionName: 'availableForMinting',
-					})
+					shouldRefresh
+						? VIEM_CONFIG[mainnet.id].readContract({
+							address: p.position,
+							abi: PositionV2ABI,
+							functionName: 'availableForMinting',
+						})
+						: Promise.resolve(BigInt(p.availableForMinting))
 				);
 			}
 

@@ -16,7 +16,7 @@ import { IndexerHealthService } from 'core/data-source/indexer-health.service';
 import { mainnet } from 'viem/chains';
 
 export const INDEXING_TIMEOUT_COUNT: number = 3;
-export const POLLING_DELAY: number = 6_000; // e.g. 6000ms (= 6sec)
+export const POLLING_DELAY: number = 15_000;
 // Note: per-source staleness now lives in IndexerHealthService.STALE_BLOCKS — a single
 // chain-head-relative threshold drives both the failover decision and the workflow gate.
 
@@ -69,8 +69,8 @@ export class ApiService {
 		const promises: Promise<any>[] = [];
 
 		if (this.guard('minters', 5 * MIN)) promises.push(this.minter.updateMinters());
-		if (this.guard('positionsV1', MIN)) promises.push(this.positions.updatePositonV1s());
-		if (this.guard('positionsV2', MIN)) promises.push(this.positions.updatePositonV2s());
+		if (this.guard('positionsV1', 5 * MIN)) promises.push(this.positions.updatePositonV1s());
+		if (this.guard('positionsV2', 5 * MIN)) promises.push(this.positions.updatePositonV2s());
 		if (this.guard('mintingV1', 5 * MIN)) promises.push(this.positions.updateMintingUpdateV1s());
 		if (this.guard('mintingV2', 5 * MIN)) promises.push(this.positions.updateMintingUpdateV2s());
 		if (this.guard('prices', MIN)) promises.push(this.prices.updatePrices());
@@ -81,13 +81,15 @@ export class ApiService {
 		if (this.guard('leaProposals', 5 * MIN)) promises.push(this.leadrate.updateLeadrateProposals());
 		if (this.guard('savingsStatus', 5 * MIN)) promises.push(this.savings.updateSavingsStatus());
 		if (this.guard('savingsRank', 10 * MIN)) promises.push(this.savings.updateSavingsRank());
-		promises.push(this.challenges.updateChallengeV1s());
-		promises.push(this.challenges.updateChallengeV2s());
-		promises.push(this.challenges.updateBidV1s());
-		promises.push(this.challenges.updateBidV2s());
-		promises.push(this.challenges.updateChallengesPrices());
+		if (this.guard('challenges', MIN)) {
+			promises.push(this.challenges.updateChallengeV1s());
+			promises.push(this.challenges.updateChallengeV2s());
+			promises.push(this.challenges.updateBidV1s());
+			promises.push(this.challenges.updateBidV2s());
+			promises.push(this.challenges.updateChallengesPrices());
+		}
 		if (this.guard('transferRef', 10 * MIN)) promises.push(this.transferRef.updateReferences());
-		promises.push(this.telegram.updateTelegram());
+		if (this.guard('telegram', MIN)) promises.push(this.telegram.updateTelegram());
 
 		return Promise.all(promises);
 	}
