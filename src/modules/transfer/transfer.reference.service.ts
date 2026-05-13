@@ -149,6 +149,12 @@ export class TransferReferenceService {
 							}
 						}
 					}`,
+				mergeBackupChainItems: {
+					rootField: 'transferReferences',
+					orderBy: 'count',
+					orderDirection: 'asc',
+					limit: 100,
+				},
 			});
 			if (!data) return [];
 			return data.transferReferences?.items ?? [];
@@ -200,6 +206,12 @@ export class TransferReferenceService {
 							}
 						}
 					}`,
+				mergeBackupChainItems: {
+					rootField: 'transferReferences',
+					orderBy: 'count',
+					orderDirection: 'asc',
+					limit: 100,
+				},
 			});
 			if (!data) return [];
 			return data?.transferReferences?.items ?? [];
@@ -232,6 +244,12 @@ export class TransferReferenceService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'transferReferences',
+				orderBy: 'count',
+				orderDirection: 'asc',
+				limit: 1000,
+			},
 		});
 
 		if (!data || !data.transferReferences.items) {

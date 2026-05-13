@@ -133,6 +133,12 @@ export class SavingsLeadrateService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'leadrateRateChangeds',
+				orderBy: 'count',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!response || !response.leadrateRateChangeds?.items) {
@@ -187,6 +193,12 @@ export class SavingsLeadrateService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'leadRateProposeds',
+				orderBy: 'count',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!response || !response.leadRateProposeds?.items) {

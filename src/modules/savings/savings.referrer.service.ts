@@ -56,6 +56,12 @@ export class SavingsReferrerService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'savingsReferrerMappings',
+				orderBy: 'balance',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!response || !response.savingsReferrerMappings?.items) {
@@ -122,6 +128,12 @@ export class SavingsReferrerService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'savingsReferrerEarningss',
+				orderBy: 'earnings',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!response || !response.savingsReferrerEarningss?.items) {

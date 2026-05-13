@@ -80,6 +80,12 @@ export class SavingsCoreService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'savingsMappings',
+				orderBy: 'balance',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!response || !response.savingsMappings?.items) {
@@ -147,6 +153,12 @@ export class SavingsCoreService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'savingsActivitys',
+				orderBy: 'created',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!response || !response.savingsActivitys?.items) {
@@ -208,6 +220,12 @@ export class SavingsCoreService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'savingsStatuss',
+				orderBy: 'updated',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!response || !response.savingsStatuss?.items) {
@@ -272,6 +290,12 @@ export class SavingsCoreService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'savingsMappings',
+				orderBy: 'balance',
+				orderDirection: 'desc',
+				limit: 20,
+			},
 		});
 
 		if (!response || !response.savingsMappings?.items) {

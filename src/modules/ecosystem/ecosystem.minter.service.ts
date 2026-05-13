@@ -53,6 +53,12 @@ export class EcosystemMinterService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'frankencoinMinters',
+				orderBy: 'applyDate',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!data || !data.frankencoinMinters) {

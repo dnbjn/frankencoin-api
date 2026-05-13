@@ -74,9 +74,7 @@ export class EcosystemFrankencoinService {
 		}
 
 		try {
-			const timestamps = all
-				? Object.keys(this.ecosystemTotalSupply)
-				: Object.keys(this.ecosystemTotalSupply).slice(-3);
+			const timestamps = all ? Object.keys(this.ecosystemTotalSupply) : Object.keys(this.ecosystemTotalSupply).slice(-3);
 
 			for (const timestamp of timestamps) {
 				await this.prisma.ecosystemSupply.upsert({
@@ -185,6 +183,12 @@ export class EcosystemFrankencoinService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'eRC20Statuss',
+				orderBy: 'updated',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!data || !data.eRC20Statuss.items) {
@@ -276,6 +280,7 @@ export class EcosystemFrankencoinService {
 						}
 					}
 				`,
+					chainId,
 				});
 
 				if (!pageData || !pageData.eRC20TotalSupplys.items) {

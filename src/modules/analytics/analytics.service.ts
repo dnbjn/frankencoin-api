@@ -66,6 +66,12 @@ export class AnalyticsService {
 					}
 				}
 			`,
+			mergeBackupChainItems: {
+				rootField: 'frankencoinProfitLosss',
+				orderBy: 'count',
+				orderDirection: 'desc',
+				limit: 1000,
+			},
 		});
 
 		if (!data || !data.frankencoinProfitLosss.items) {
@@ -277,6 +283,7 @@ export class AnalyticsService {
 					}
 				}
 			`,
+			preferBackup: true,
 		});
 
 		if (!txLog || !txLog.analyticTransactionLogs.items) {
