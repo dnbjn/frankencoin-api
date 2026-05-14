@@ -27,7 +27,8 @@ export type PriceQueryCurrencies = {
 
 export type PriceQuery = ERC20Info & {
 	source?: PriceSource;
-	timestamp: number;
+	timestamp: number; // last *successful* price time (0 = never priced)
+	lastAttempt?: number; // last fetch attempt time (success or failure)
 	price: PriceQueryCurrencies;
 };
 

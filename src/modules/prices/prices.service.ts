@@ -38,6 +38,8 @@ type PriceSourceResultMapping = Record<Address, PriceSourceResult>;
 export class PricesService {
 	private readonly logger = new Logger(this.constructor.name);
 
+	private static readonly FAILED_FETCH_BACKOFF = 30 * 60 * 1000; // 30 min
+
 	private fetchedPrices: PriceQueryObjectArray = {};
 	private fetchedMarketChart: PriceMarketChartObject = { prices: [], market_caps: [], total_volumes: [] };
 	private historyService: IHistoryService | null = null;
@@ -441,10 +443,18 @@ export class PricesService {
 				this.logger.debug(`Price for ${erc.name} not available, trying to fetch`);
 				priceFetchMode[addr] = 'new';
 				pricesToFetch.push(erc);
-			} else if (oldEntry.timestamp + 300_000 < Date.now()) {
-				// needs to update => try to fetch
+			} else if (oldEntry.timestamp > 0) {
+				// has a valid price => refresh if older than 5 min
+				if (oldEntry.timestamp + 300_000 < Date.now()) {
+					pricesQueryUpdateCount += 1;
+					this.logger.debug(`Price for ${erc.name} out of date, trying to fetch`);
+					priceFetchMode[addr] = 'update';
+					pricesToFetch.push(erc);
+				}
+			} else if ((oldEntry.lastAttempt ?? 0) + PricesService.FAILED_FETCH_BACKOFF < Date.now()) {
+				// previous attempt failed (timestamp === 0) => retry only after backoff
 				pricesQueryUpdateCount += 1;
-				this.logger.debug(`Price for ${erc.name} out of date, trying to fetch`);
+				this.logger.debug(`Price for ${erc.name} still unpriced, retrying after backoff`);
 				priceFetchMode[addr] = 'update';
 				pricesToFetch.push(erc);
 			}
@@ -468,18 +478,26 @@ export class PricesService {
 					...erc,
 					source: result?.source || null,
 					timestamp: result === null ? 0 : Date.now(),
+					lastAttempt: Date.now(),
 					price: result === null ? { usd: 0, chf: 0 } : result.price,
 				};
 			} else if (priceFetchMode[addr] === 'update') {
 				const oldEntry = this.fetchedPrices[addr];
 				if (result == null) {
 					pricesQueryUpdateCountFailed += 1;
+					// preserve previous price/timestamp, but bump lastAttempt so the backoff advances
+					pricesQuery[addr] = {
+						...erc,
+						...oldEntry,
+						lastAttempt: Date.now(),
+					};
 				} else {
 					pricesQuery[addr] = {
 						...erc,
 						...oldEntry,
 						source: result.source,
 						timestamp: Date.now(),
+						lastAttempt: Date.now(),
 						price: { ...oldEntry.price, ...result.price },
 					};
 				}
@@ -499,7 +517,9 @@ export class PricesService {
 			}
 		});
 
-		if (pricesQueryUpdateCount > pricesQueryUpdateCountFailed || pricesQueryNewCount > pricesQueryNewCountFailed) {
+		// persist whenever anything was attempted: every fetched entry mutates state
+		// (price and/or lastAttempt), so the backoff survives restarts
+		if (pricesToFetch.length > 0) {
 			this.writeBackupPriceQuery();
 		}
 
@@ -522,7 +542,7 @@ export class PricesService {
 		this.logger.debug(`Fetched prices state: ${JSON.stringify(this.fetchedPrices)}`);
 	}
 
-	@Cron(CronExpression.EVERY_10_MINUTES)
+	@Cron(CronExpression.EVERY_HOUR)
 	async updateMarketChart() {
 		this.logger.debug('Updating Market Chart');
 
