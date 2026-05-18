@@ -23,5 +23,5 @@ ${subscriptions}
 
 Use /subscribe to manage alerts or /help for status.
 
-v${process.env.npm_package_version} · [🌐 App](${AppUrl('')}) · [📦 GitHub](https://github.com/Frankencoin-ZCHF/frankencoin-api)`;
+v${process.env.npm_package_version} · [🌐 App](${AppUrl('')}) · [📦 GitHub](https://github.com/dnbjn/frankencoin-api)`;
 }

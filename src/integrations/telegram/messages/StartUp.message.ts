@@ -12,5 +12,5 @@ Back online and monitoring the ${mainnet.name} ecosystem.
 
 📡 ${subs}
 
-v${process.env.npm_package_version} · [🌐 App](${AppUrl('')}) · [📦 GitHub](https://github.com/Frankencoin-ZCHF/frankencoin-api)`;
+v${process.env.npm_package_version} · [🌐 App](${AppUrl('')}) · [📦 GitHub](https://github.com/dnbjn/frankencoin-api)`;
 }

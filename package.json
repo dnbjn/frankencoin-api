@@ -6,9 +6,9 @@
 	"main": "./exports/dist/index.js",
 	"module": "./exports/dist/index.mjs",
 	"types": "./exports/dist/index.d.ts",
-	"homepage": "https://api.frankencoin.com",
+	"homepage": "https://api.zchf.app",
 	"repository": {
-		"url": "git+https://github.com/frankencoin-ZCHF/frankencoin-api.git"
+		"url": "git+https://github.com/dnbjn/frankencoin-api.git"
 	},
 	"scripts": {
 		"build": "nest build",
