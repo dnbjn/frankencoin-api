@@ -11,6 +11,7 @@ import { PricesService } from 'modules/prices/prices.service';
 import { SavingsCoreService } from 'modules/savings/savings.core.service';
 import { SavingsLeadrateService } from 'modules/savings/savings.leadrate.service';
 import { TelegramService } from 'integrations/telegram/telegram.service';
+import { BridgeService } from 'modules/bridge/bridge.service';
 import { TransferReferenceService } from 'modules/transfer/transfer.reference.service';
 import { IndexerHealthService } from 'core/data-source/indexer-health.service';
 import { mainnet } from 'viem/chains';
@@ -52,6 +53,7 @@ export class ApiService {
 		private readonly leadrate: SavingsLeadrateService,
 		private readonly savings: SavingsCoreService,
 		private readonly transferRef: TransferReferenceService,
+		private readonly bridge: BridgeService,
 		private readonly indexerHealth: IndexerHealthService
 	) {
 		setTimeout(() => this.updateBlockheight(), 100);
@@ -89,8 +91,9 @@ export class ApiService {
 			promises.push(this.challenges.updateChallengesPrices());
 		}
 		if (this.guard('transferRef', 10 * MIN)) promises.push(this.transferRef.updateReferences());
+		if (this.guard('bridgeProposals', 5 * MIN)) promises.push(this.bridge.updateProposals());
+		if (this.guard('bridgeChains', 5 * MIN)) promises.push(this.bridge.updateChains());
 		if (this.guard('telegram', MIN)) promises.push(this.telegram.updateTelegram());
-
 		return Promise.all(promises);
 	}
 

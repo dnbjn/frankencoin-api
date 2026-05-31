@@ -1,4 +1,4 @@
-// challenges/challenges.types.ts
+// src/modules/challenges/challenges.types.ts
 var ChallengesQueryStatus = /* @__PURE__ */ ((ChallengesQueryStatus2) => {
   ChallengesQueryStatus2["Active"] = "Active";
   ChallengesQueryStatus2["Success"] = "Success";

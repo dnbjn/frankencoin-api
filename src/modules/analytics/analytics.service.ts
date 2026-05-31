@@ -29,7 +29,7 @@ import { mainnet } from 'viem/chains';
 export class AnalyticsService {
 	private readonly logger = new Logger(this.constructor.name);
 	private exposure: ApiAnalyticsCollateralExposure;
-	private fetchedDailyLogs: AnalyticsDailyLog[];
+	private fetchedDailyLogs: AnalyticsDailyLog[] = [];
 
 	constructor(
 		private readonly positions: PositionsService,

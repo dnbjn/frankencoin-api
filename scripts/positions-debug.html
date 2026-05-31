@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>ZCHF Positions Debug</title>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+		<style>
+			* { box-sizing: border-box; margin: 0; padding: 0; }
+			body { font-family: monospace; background: #f5f5f5; color: #111; padding: 20px; }
+			h1 { font-size: 1.2rem; margin-bottom: 12px; color: #000; }
+			h2 { font-size: 1rem; margin-bottom: 8px; color: #92400e; }
+			h3 { font-size: 0.85rem; margin-bottom: 6px; color: #475569; }
+			#controls {
+				display: flex; gap: 12px; align-items: center;
+				margin-bottom: 16px; flex-wrap: wrap;
+			}
+			#base-url {
+				flex: 1; min-width: 320px;
+				background: #fff; border: 1px solid #ccc;
+				color: #111; padding: 6px 10px;
+				border-radius: 4px; font-family: monospace;
+			}
+			button {
+				background: #2563eb; color: #fff; border: none;
+				padding: 7px 16px; border-radius: 4px; cursor: pointer; font-family: monospace;
+			}
+			button:hover { background: #1d4ed8; }
+			#status { font-size: 0.8rem; color: #666; }
+			#stats {
+				display: flex; gap: 20px; flex-wrap: wrap;
+				margin-bottom: 14px; font-size: 0.82rem; color: #555;
+			}
+			#stats span b { color: #111; }
+			.chart-container {
+				position: relative; width: 100%; height: 380px;
+				background: #fff; border-radius: 6px; padding: 16px;
+				border: 1px solid #e0e0e0; margin-bottom: 20px;
+			}
+			.section { margin-top: 20px; }
+			.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+			@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+			table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+			th {
+				text-align: left; padding: 6px 10px;
+				background: #f0f0f0; color: #444;
+				border-bottom: 1px solid #ddd; white-space: nowrap;
+			}
+			th.num, td.num { text-align: right; }
+			td { padding: 5px 10px; border-bottom: 1px solid #eee; white-space: nowrap; }
+			tr:hover td { background: #fafafa; }
+			.tag {
+				display: inline-block; padding: 1px 6px;
+				border-radius: 3px; font-size: 0.72rem;
+			}
+			.tag-blue   { background: #dbeafe; color: #1d4ed8; }
+			.tag-green  { background: #dcfce7; color: #15803d; }
+			.tag-yellow { background: #fef9c3; color: #b45309; }
+			.tag-red    { background: #fee2e2; color: #b91c1c; }
+			.tag-gray   { background: #f3f4f6; color: #6b7280; }
+			.tag-purple { background: #f3e8ff; color: #7c3aed; }
+			.collateral-section {
+				background: #fff; border: 1px solid #e0e0e0;
+				border-radius: 6px; margin-bottom: 16px; overflow: hidden;
+			}
+			.collateral-header {
+				padding: 8px 14px; background: #f8f8f8;
+				border-bottom: 1px solid #e0e0e0;
+				font-size: 0.88rem; font-weight: bold; color: #333;
+				display: flex; align-items: center; gap: 10px;
+			}
+			.subtotal-row td { background: #f9fafb; font-weight: bold; border-top: 1px solid #ddd; }
+		</style>
+	</head>
+	<body>
+		<h1>ZCHF Positions — Debug</h1>
+
+		<div id="controls">
+			<input id="base-url" type="text" value="https://api.frankencoin.com" />
+			<button onclick="load()">Load</button>
+			<span id="status"></span>
+		</div>
+
+		<div id="stats"></div>
+
+		<div class="section">
+			<div class="grid-2">
+				<div>
+					<h2>Minted ZCHF by Collateral</h2>
+					<div class="chart-container" style="height:300px">
+						<canvas id="chart-minted-collateral"></canvas>
+					</div>
+				</div>
+				<div>
+					<h2>Annual Interest Rate Distribution</h2>
+					<div class="chart-container" style="height:300px">
+						<canvas id="chart-rates"></canvas>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="section">
+			<h2>Minted vs. Limit by Position</h2>
+			<div class="chart-container">
+				<canvas id="chart-utilization"></canvas>
+			</div>
+		</div>
+
+		<div class="section" id="section-positions">
+			<h2>Open Positions (grouped by collateral)</h2>
+			<div id="positions-container"></div>
+		</div>
+
+		<script>
+		const COL_COLORS = [
+			'#2563eb', '#16a34a', '#d97706', '#dc2626',
+			'#7c3aed', '#0891b2', '#db2777', '#65a30d',
+			'#ea580c', '#0d9488',
+		];
+
+		let chartMinted = null;
+		let chartRates  = null;
+		let chartUtil   = null;
+
+		function setStatus(msg, color) {
+			const el = document.getElementById('status');
+			el.textContent = msg;
+			el.style.color = color || '#666';
+		}
+
+		function fromWei(raw, decimals) {
+			if (!raw || raw === '0') return 0;
+			try {
+				const d = BigInt(10) ** BigInt(decimals);
+				return Number(BigInt(raw) * 1000000n / d) / 1000000;
+			} catch { return 0; }
+		}
+
+		function ppm(rate) { return (rate / 10000).toFixed(2) + '%'; }
+
+		function fmtZchf(n) {
+			return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ZCHF';
+		}
+
+		function fmtCol(n, sym) {
+			const decimals = n < 1 ? 6 : n < 1000 ? 4 : 2;
+			return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + ' ' + sym;
+		}
+
+		function fmtPrice(n) {
+			return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+		}
+
+		function ts(unix) {
+			if (!unix || unix === 0) return '—';
+			return new Date(unix * 1000).toISOString().split('T')[0];
+		}
+
+		function shortAddr(addr) {
+			return addr ? addr.slice(0, 8) + '…' + addr.slice(-6) : '—';
+		}
+
+		async function fetchJson(url) {
+			const res = await fetch(url);
+			if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+			return res.json();
+		}
+
+		async function load() {
+			const base = document.getElementById('base-url').value.trim().replace(/\/$/, '');
+			setStatus('Fetching…');
+
+			let data;
+			try {
+				data = await fetchJson(`${base}/positions/open`);
+			} catch (e) {
+				setStatus('Error: ' + e.message, '#dc2626');
+				return;
+			}
+
+			const positions = Object.values(data.map || {});
+			if (positions.length === 0) {
+				setStatus('No open positions found.', '#b45309');
+				document.getElementById('stats').innerHTML = '';
+				document.getElementById('positions-container').innerHTML = '';
+				return;
+			}
+
+			setStatus(`Loaded ${positions.length} open positions`, '#16a34a');
+			renderStats(positions);
+			renderMintedChart(positions);
+			renderRatesChart(positions);
+			renderUtilizationChart(positions);
+			renderPositionsTables(positions);
+		}
+
+		function groupByCollateral(positions) {
+			const map = new Map();
+			for (const p of positions) {
+				const key = p.collateralSymbol;
+				if (!map.has(key)) map.set(key, []);
+				map.get(key).push(p);
+			}
+			// sort groups by total minted desc
+			return new Map([...map.entries()].sort((a, b) => {
+				const sumA = a[1].reduce((s, p) => s + fromWei(p.minted, 18), 0);
+				const sumB = b[1].reduce((s, p) => s + fromWei(p.minted, 18), 0);
+				return sumB - sumA;
+			}));
+		}
+
+		function renderStats(positions) {
+			const totalMinted = positions.reduce((s, p) => s + fromWei(p.minted, 18), 0);
+			const weightedRate = positions.reduce((s, p) => {
+				const m = fromWei(p.minted, 18);
+				return s + m * (p.annualInterestPPM / 10000);
+			}, 0);
+			const avgRate = totalMinted > 0 ? weightedRate / totalMinted : 0;
+			const annualCost = totalMinted * avgRate / 100;
+			const originals = positions.filter(p => p.isOriginal).length;
+			const clones    = positions.filter(p => p.isClone).length;
+
+			document.getElementById('stats').innerHTML = `
+				<span>Total positions: <b>${positions.length}</b> (${originals} original / ${clones} clone)</span>
+				<span>Total minted: <b>${fmtZchf(totalMinted)}</b></span>
+				<span>Weighted avg rate: <b>${avgRate.toFixed(2)}%</b></span>
+				<span>Est. annual interest: <b>${fmtZchf(annualCost)}</b></span>
+			`;
+		}
+
+		function renderMintedChart(positions) {
+			const groups = groupByCollateral(positions);
+			const labels = [], values = [], colors = [];
+			let ci = 0;
+			for (const [sym, group] of groups) {
+				const total = group.reduce((s, p) => s + fromWei(p.minted, 18), 0);
+				if (total > 0) {
+					labels.push(sym);
+					values.push(total);
+					colors.push(COL_COLORS[ci++ % COL_COLORS.length]);
+				}
+			}
+
+			if (chartMinted) chartMinted.destroy();
+			chartMinted = new Chart(document.getElementById('chart-minted-collateral').getContext('2d'), {
+				type: 'doughnut',
+				data: {
+					labels,
+					datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }],
+				},
+				options: {
+					responsive: true, maintainAspectRatio: false, animation: false,
+					plugins: {
+						legend: { position: 'right', labels: { color: '#333', boxWidth: 12 } },
+						tooltip: {
+							callbacks: {
+								label: item => {
+									const v = item.raw;
+									const total = item.dataset.data.reduce((a, b) => a + b, 0);
+									const pct = ((v / total) * 100).toFixed(1);
+									return ` ${v.toLocaleString('en-US', { maximumFractionDigits: 0 })} ZCHF (${pct}%)`;
+								},
+							},
+						},
+					},
+				},
+			});
+		}
+
+		function renderRatesChart(positions) {
+			// Bucket rates into 0.5% intervals
+			const buckets = {};
+			for (const p of positions) {
+				const rate = p.annualInterestPPM / 10000;
+				const bucket = (Math.floor(rate * 2) / 2).toFixed(1);
+				buckets[bucket] = (buckets[bucket] || 0) + fromWei(p.minted, 18);
+			}
+			const sorted = Object.keys(buckets).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+			if (chartRates) chartRates.destroy();
+			chartRates = new Chart(document.getElementById('chart-rates').getContext('2d'), {
+				type: 'bar',
+				data: {
+					labels: sorted.map(b => b + '%'),
+					datasets: [{
+						label: 'Minted ZCHF',
+						data: sorted.map(b => buckets[b]),
+						backgroundColor: '#2563eb99',
+						borderColor: '#2563eb',
+						borderWidth: 1,
+					}],
+				},
+				options: {
+					responsive: true, maintainAspectRatio: false, animation: false,
+					plugins: {
+						legend: { display: false },
+						tooltip: {
+							callbacks: {
+								label: item => ` ${item.raw.toLocaleString('en-US', { maximumFractionDigits: 0 })} ZCHF`,
+							},
+						},
+					},
+					scales: {
+						x: { ticks: { color: '#888' }, grid: { color: '#ececec' }, title: { display: true, text: 'Annual Interest Rate', color: '#888' } },
+						y: {
+							ticks: { color: '#888', callback: v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v.toLocaleString() },
+							grid: { color: '#ececec' },
+							title: { display: true, text: 'Minted (ZCHF)', color: '#888' },
+						},
+					},
+				},
+			});
+		}
+
+		function renderUtilizationChart(positions) {
+			// Show top 20 positions by minted, sorted desc
+			const sorted = [...positions]
+				.filter(p => fromWei(p.minted, 18) > 0)
+				.sort((a, b) => fromWei(b.minted, 18) - fromWei(a.minted, 18))
+				.slice(0, 20);
+
+			const labels  = sorted.map(p => shortAddr(p.position));
+			const minted  = sorted.map(p => fromWei(p.minted, 18));
+			const avail   = sorted.map(p => fromWei(p.availableForPosition, 18));
+
+			if (chartUtil) chartUtil.destroy();
+			chartUtil = new Chart(document.getElementById('chart-utilization').getContext('2d'), {
+				type: 'bar',
+				data: {
+					labels,
+					datasets: [
+						{ label: 'Minted (ZCHF)',     data: minted, backgroundColor: '#2563eb99', borderColor: '#2563eb', borderWidth: 1, stack: 'a' },
+						{ label: 'Available (ZCHF)',  data: avail,  backgroundColor: '#e2e8f0',   borderColor: '#cbd5e1', borderWidth: 1, stack: 'a' },
+					],
+				},
+				options: {
+					responsive: true, maintainAspectRatio: false, animation: false,
+					plugins: {
+						legend: { labels: { color: '#333', boxWidth: 12 } },
+						tooltip: {
+							mode: 'index', intersect: false,
+							callbacks: {
+								label: item => ` ${item.dataset.label}: ${item.raw.toLocaleString('en-US', { maximumFractionDigits: 0 })} ZCHF`,
+							},
+						},
+					},
+					scales: {
+						x: { stacked: true, ticks: { color: '#888', maxRotation: 45 }, grid: { color: '#ececec' } },
+						y: {
+							stacked: true,
+							ticks: { color: '#888', callback: v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v.toLocaleString() },
+							grid: { color: '#ececec' },
+							title: { display: true, text: 'ZCHF', color: '#888' },
+						},
+					},
+				},
+			});
+		}
+
+		function renderPositionsTables(positions) {
+			const groups = groupByCollateral(positions);
+			const container = document.getElementById('positions-container');
+			container.innerHTML = '';
+
+			let ci = 0;
+			for (const [sym, group] of groups) {
+				const color = COL_COLORS[ci++ % COL_COLORS.length];
+				const name  = group[0].collateralName;
+				const dec   = group[0].collateralDecimals;
+
+				// Sort by minted desc within group
+				const sorted = [...group].sort((a, b) => fromWei(b.minted, 18) - fromWei(a.minted, 18));
+
+				const totalMinted = sorted.reduce((s, p) => s + fromWei(p.minted, 18), 0);
+				const weightedRate = sorted.reduce((s, p) => s + fromWei(p.minted, 18) * (p.annualInterestPPM / 10000), 0);
+				const avgRate = totalMinted > 0 ? weightedRate / totalMinted : 0;
+
+				const rows = sorted.map(p => {
+					const minted  = fromWei(p.minted, 18);
+					const bal     = fromWei(p.collateralBalance, dec);
+					const liqPrice = fromWei(p.price, 36 - dec);
+					const limit   = fromWei(p.limitForPosition, 18);
+					const avail   = fromWei(p.availableForPosition, 18);
+					const util    = limit > 0 ? (minted / limit * 100) : 0;
+					const rate    = p.annualInterestPPM / 10000;
+					const reserve = p.reserveContribution / 10000;
+					const typeTag = p.isOriginal
+						? '<span class="tag tag-blue">Original</span>'
+						: '<span class="tag tag-purple">Clone</span>';
+					const verTag  = `<span class="tag tag-gray">V${p.version}</span>`;
+					const expiry  = ts(p.expiration);
+					const expiryCell = expiry === '—'
+						? '<span style="color:#aaa">—</span>'
+						: `<span>${expiry}</span>`;
+
+					return `<tr>
+						<td style="color:#2563eb" title="${p.position}">${shortAddr(p.position)}</td>
+						<td>${verTag} ${typeTag}</td>
+						<td class="num">${fmtCol(bal, sym)}</td>
+						<td class="num">${fmtPrice(liqPrice)} ZCHF</td>
+						<td class="num">${minted > 0 ? fmtZchf(minted) : '<span style="color:#aaa">—</span>'}</td>
+						<td class="num">${fmtZchf(limit)}</td>
+						<td class="num">${fmtZchf(avail)}</td>
+						<td class="num">
+							<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+								<div style="width:60px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+									<div style="width:${Math.min(util,100).toFixed(1)}%;height:100%;background:${util>90?'#dc2626':util>70?'#d97706':'#16a34a'};border-radius:3px"></div>
+								</div>
+								${util.toFixed(1)}%
+							</div>
+						</td>
+						<td class="num">${rate.toFixed(2)}%</td>
+						<td class="num">${reserve.toFixed(2)}%</td>
+						<td>${expiryCell}</td>
+					</tr>`;
+				}).join('');
+
+				const section = document.createElement('div');
+				section.className = 'collateral-section';
+				section.innerHTML = `
+					<div class="collateral-header">
+						<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color}"></span>
+						${name} <span style="color:#888">(${sym})</span>
+						&nbsp;·&nbsp; ${sorted.length} position${sorted.length !== 1 ? 's' : ''}
+						&nbsp;·&nbsp; <span style="color:#555">Total minted: <b>${fmtZchf(totalMinted)}</b></span>
+						&nbsp;·&nbsp; <span style="color:#555">Avg rate: <b>${avgRate.toFixed(2)}%</b></span>
+					</div>
+					<div style="overflow-x:auto">
+					<table>
+						<thead>
+							<tr>
+								<th>Position</th>
+								<th>Type</th>
+								<th class="num">Collateral</th>
+								<th class="num">Liq. Price</th>
+								<th class="num">Minted</th>
+								<th class="num">Limit</th>
+								<th class="num">Available</th>
+								<th class="num">Utilization</th>
+								<th class="num">Rate</th>
+								<th class="num">Reserve</th>
+								<th>Expires</th>
+							</tr>
+						</thead>
+						<tbody>${rows}</tbody>
+						<tfoot>
+							<tr class="subtotal-row">
+								<td colspan="4">Subtotal</td>
+								<td class="num">${fmtZchf(totalMinted)}</td>
+								<td colspan="3"></td>
+								<td class="num">${avgRate.toFixed(2)}% avg</td>
+								<td colspan="2"></td>
+							</tr>
+						</tfoot>
+					</table>
+					</div>
+				`;
+				container.appendChild(section);
+			}
+		}
+
+		load();
+		</script>
+	</body>
+</html>

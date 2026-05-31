@@ -2,9 +2,7 @@ import { AppUrl } from 'utils/func-helper';
 import { mainnet } from 'viem/chains';
 
 export function StartUpMessage(handles: string[]): string {
-	const subs = handles
-		.filter((h) => h !== '/help')
-		.join(' · ');
+	const subs = handles.filter((h) => h !== '/help').join(' · ');
 
 	return `🔄 *Frankencoin Bot Restarted*
 

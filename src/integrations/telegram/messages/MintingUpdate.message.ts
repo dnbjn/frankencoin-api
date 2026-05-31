@@ -1,6 +1,6 @@
 import { MintingUpdateQuery } from 'modules/positions/positions.types';
 import { PriceQuery, PriceQueryObjectArray } from 'modules/prices/prices.types';
-import { formatCurrency, normalizeAddress, shortenString } from 'utils/format';
+import { escapeMd, formatCurrency, normalizeAddress, shortenString } from 'utils/format';
 import { formatUnits } from 'viem';
 import { AppUrl, ExplorerAddressUrl, ExplorerTxUrl } from 'utils/func-helper';
 
@@ -13,12 +13,15 @@ export function MintingUpdateMessage(minting: MintingUpdateQuery, prices: PriceQ
 	const timeframeDays = Math.round(minting.feeTimeframe / 86400);
 	const sign = mintedAdjusted >= 0 ? '+' : '-';
 
+	const sym = escapeMd(minting.collateralSymbol);
+	const name = escapeMd(minting.collateralName);
+
 	return `🔄 *New Minting*
 
 🏦 Position: \`${shortenString(minting.position)}\` (v${minting.version})
 👤 Owner: \`${shortenString(minting.owner)}\`
 
-💎 Collateral: *${minting.collateralName} (${minting.collateralSymbol})*
+💎 Collateral: *${name} (${sym})*
    Market Price: *${formatCurrency(marketPrice, 2)} ZCHF*
    Liq. Price: *${formatCurrency(liqPrice, 2)} ZCHF*
    *Ratio: ${formatCurrency(ratio * 100, 2)}%*

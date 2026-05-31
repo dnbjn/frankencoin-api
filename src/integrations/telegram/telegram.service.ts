@@ -24,13 +24,18 @@ import { formatUnits } from 'viem';
 import { PriceQuery } from 'modules/prices/prices.types';
 import { PositionPriceAlert, PositionPriceLowest, PositionPriceWarning } from './messages/PositionPrice.message';
 import { AnalyticsService } from 'modules/analytics/analytics.service';
-import { DailyInfosMessage } from './messages/DailyInfos.message';
+import { WeeklyInfosMessage } from './messages/WeeklyInfos.message';
 import { mainnet } from 'viem/chains';
 import { EcosystemFrankencoinService } from 'modules/ecosystem/ecosystem.frankencoin.service';
 import { formatFloat, normalizeAddress } from 'utils/format';
 import { EquityInvestedMessage } from './messages/EquityInvested.message';
 import { EquityRedeemedMessage } from './messages/EquityRedeemed.message';
 import { PositionDeniedMessage } from './messages/PositionDenied.message';
+import { BridgeService } from 'modules/bridge/bridge.service';
+import { CCIPProposalMessage } from './messages/CCIPProposal.message';
+import { CCIPProposalDeniedMessage } from './messages/CCIPProposalDenied.message';
+import { CCIPProposalEnactedMessage } from './messages/CCIPProposalEnacted.message';
+import { CCIPRateLimitMessage } from './messages/CCIPRateLimit.message';
 
 @Injectable()
 export class TelegramService {
@@ -38,7 +43,7 @@ export class TelegramService {
 	private readonly logger = new Logger(this.constructor.name);
 	private enabled = !!process.env.TELEGRAM_BOT_TOKEN;
 	private bot: TelegramBot | null = null;
-	private telegramHandles: string[] = ['/MintingUpdates', '/PriceAlerts', '/DailyInfos', '/help'];
+	private telegramHandles: string[] = ['/MintingUpdates', '/PriceAlerts', '/WeeklyInfos', '/help'];
 	private telegramState: TelegramState;
 	private telegramGroupState: TelegramGroupState;
 
@@ -50,7 +55,8 @@ export class TelegramService {
 		private readonly position: PositionsService,
 		private readonly prices: PricesService,
 		private readonly challenge: ChallengesService,
-		private readonly analytics: AnalyticsService
+		private readonly analytics: AnalyticsService,
+		private readonly bridge: BridgeService
 	) {
 		if (!this.enabled) {
 			this.logger.warn('TELEGRAM_BOT_TOKEN not set — Telegram integration disabled');
@@ -94,6 +100,10 @@ export class TelegramService {
 			bids: this.startUpTime,
 			equityInvested: this.startUpTime,
 			equityRedeemed: this.startUpTime,
+			ccipProposalNew: this.startUpTime,
+			ccipProposalDenied: this.startUpTime,
+			ccipProposalEnacted: this.startUpTime,
+			ccipRateLimit: this.startUpTime,
 		};
 
 		this.telegramGroupState = {
@@ -186,10 +196,19 @@ export class TelegramService {
 				notFound: 'chat not found',
 				deleted: 'the group chat was deleted',
 				blocked: 'bot was blocked by the user',
+				parseEntities: 'parse entities',
 			};
 
 			if (typeof error === 'object') {
-				if (error?.message.includes(msg.deleted)) {
+				if (error?.message.includes(msg.parseEntities)) {
+					// Markdown parsing failed — retry as plain text so the alert is never lost
+					this.logger.warn(`Markdown parse error for group ${group}, retrying as plain text`);
+					try {
+						await this.bot.sendMessage(group.toString(), message, { disable_web_page_preview: true });
+					} catch (e2) {
+						this.logger.warn(`Plain text fallback also failed for group ${group}: ${e2?.message}`);
+					}
+				} else if (error?.message.includes(msg.deleted)) {
 					this.logger.warn(msg.deleted + `: ${group}`);
 					this.removeTelegramGroup(group);
 				} else if (error?.message.includes(msg.notFound)) {
@@ -465,6 +484,48 @@ export class TelegramService {
 				this.sendMessageAll(EquityRedeemedMessage(i));
 			}
 		}
+
+		// BRIDGE ALERTS — new proposals
+		const newCcipProposals = this.bridge.getPendingProposals().filter((p) => p.created * 1000 > this.telegramState.ccipProposalNew);
+		if (newCcipProposals.length > 0) {
+			this.telegramState.ccipProposalNew = Date.now();
+			for (const proposal of newCcipProposals) {
+				this.sendMessageAll(CCIPProposalMessage(proposal));
+			}
+		}
+
+		// BRIDGE ALERTS — denied proposals
+		const deniedCcipProposals = this.bridge
+			.getDeniedProposals()
+			.filter((p) => p.deniedAt * 1000 > this.telegramState.ccipProposalDenied);
+		if (deniedCcipProposals.length > 0) {
+			this.telegramState.ccipProposalDenied = Date.now();
+			for (const proposal of deniedCcipProposals) {
+				this.sendMessageAll(CCIPProposalDeniedMessage(proposal));
+			}
+		}
+
+		// BRIDGE ALERTS — enacted proposals
+		const enactedCcipProposals = this.bridge
+			.getEnactedProposals()
+			.filter((p) => p.enactedAt * 1000 > this.telegramState.ccipProposalEnacted);
+		if (enactedCcipProposals.length > 0) {
+			this.telegramState.ccipProposalEnacted = Date.now();
+			for (const proposal of enactedCcipProposals) {
+				this.sendMessageAll(CCIPProposalEnactedMessage(proposal));
+			}
+		}
+
+		// BRIDGE ALERTS — rate limit changes
+		const rateLimitUpdates = this.bridge
+			.getChains()
+			.list.filter((c) => c.rateLimitUpdatedAt !== null && c.rateLimitUpdatedAt * 1000 > this.telegramState.ccipRateLimit);
+		if (rateLimitUpdates.length > 0) {
+			this.telegramState.ccipRateLimit = Date.now();
+			for (const chain of rateLimitUpdates) {
+				this.sendMessageAll(CCIPRateLimitMessage(chain));
+			}
+		}
 	}
 
 	upsertTelegramGroup(id: number | string): boolean {
@@ -500,9 +561,12 @@ export class TelegramService {
 
 	getSubscribedGroups(handle: string): string[] {
 		const key = handle.replace('/', '');
-		return Object.entries(this.telegramGroupState.subscription)
-			.filter(([_, subs]) => subs[key])
-			.map(([chatId]) => chatId);
+		return (
+			Object.entries(this.telegramGroupState.subscription)
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				.filter(([_, subs]) => subs[key])
+				.map(([chatId]) => chatId)
+		);
 	}
 
 	private buildSubscriptionKeyboard(chatId: string): TelegramBot.InlineKeyboardButton[][] {
@@ -510,7 +574,7 @@ export class TelegramService {
 		return [
 			[{ text: `${subs['MintingUpdates'] ? '✅' : '⬜'} Minting Updates`, callback_data: 'sub:MintingUpdates' }],
 			[{ text: `${subs['PriceAlerts'] ? '✅' : '⬜'} Price Alerts`, callback_data: 'sub:PriceAlerts' }],
-			[{ text: `${subs['DailyInfos'] ? '✅' : '⬜'} Daily Infos (weekly)`, callback_data: 'sub:DailyInfos' }],
+			[{ text: `${subs['WeeklyInfos'] ? '✅' : '⬜'} Weekly Infos`, callback_data: 'sub:WeeklyInfos' }],
 		];
 	}
 
@@ -598,17 +662,21 @@ export class TelegramService {
 	}
 
 	@Cron(CronExpression.EVERY_WEEK)
-	scheduleDailyInfos() {
+	scheduleWeeklyInfos() {
 		if (!this.enabled) return;
-		const days = 1000 * 3600 * 24 * 30;
-		const infos = this.analytics.getDailyLog().logs.filter((i) => Number(i.timestamp) >= Date.now() - days);
-		const groups = this.getSubscribedGroups('/DailyInfos');
+		const days = 3600 * 24 * 30; // seconds
+		const infos = this.analytics.getDailyLog().logs.filter((i) => Number(i.timestamp) >= Date.now() / 1000 - days);
+		const groups = this.getSubscribedGroups('/WeeklyInfos');
 
 		const before = infos.at(0);
 		const now = infos.at(-1);
 
-		const supply = this.frankencoin.getTotalSupply();
+		if (!before || !now) {
+			this.logger.warn('scheduleWeeklyInfos: no analytics data available, skipping');
+			return;
+		}
 
-		this.sendMessageGroup(groups, DailyInfosMessage(before, now, supply));
+		const supply = this.frankencoin.getTotalSupply();
+		this.sendMessageGroup(groups, WeeklyInfosMessage(before, now, supply));
 	}
 }

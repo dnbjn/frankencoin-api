@@ -29,7 +29,7 @@ import { BidTakenMessage } from '../src/integrations/telegram/messages/BidTaken.
 import { MintingUpdateMessage } from '../src/integrations/telegram/messages/MintingUpdate.message';
 import { EquityInvestedMessage } from '../src/integrations/telegram/messages/EquityInvested.message';
 import { EquityRedeemedMessage } from '../src/integrations/telegram/messages/EquityRedeemed.message';
-import { DailyInfosMessage } from '../src/integrations/telegram/messages/DailyInfos.message';
+import { WeeklyInfosMessage } from '../src/integrations/telegram/messages/WeeklyInfos.message';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -312,8 +312,8 @@ const mockSupply: any = {
 // ---------------------------------------------------------------------------
 // Messages to send
 // ---------------------------------------------------------------------------
-const handles = ['/MintingUpdates', '/PriceAlerts', '/DailyInfos', '/help'];
-const chatSubs = { MintingUpdates: true, PriceAlerts: false, DailyInfos: true };
+const handles = ['/MintingUpdates', '/PriceAlerts', '/WeeklyInfos', '/help'];
+const chatSubs = { MintingUpdates: true, PriceAlerts: false, WeeklyInfos: true };
 
 const messages: Array<{ label: string; text: string }> = [
 	{ label: 'WelcomeGroup', text: WelcomeGroupMessage(CHAT_ID, handles) },
@@ -336,7 +336,7 @@ const messages: Array<{ label: string; text: string }> = [
 	{ label: 'MintingUpdate', text: MintingUpdateMessage(mockMinting, mockPrices) },
 	{ label: 'EquityInvested', text: EquityInvestedMessage(mockEquityLog) },
 	{ label: 'EquityRedeemed', text: EquityRedeemedMessage({ ...mockEquityLog, kind: 'Equity:Redeemed' }) },
-	{ label: 'DailyInfos', text: DailyInfosMessage(mockDailyBefore, mockDailyNow, mockSupply) },
+	{ label: 'WeeklyInfos', text: WeeklyInfosMessage(mockDailyBefore, mockDailyNow, mockSupply) },
 ];
 
 // ---------------------------------------------------------------------------

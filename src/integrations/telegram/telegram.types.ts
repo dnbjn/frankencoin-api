@@ -16,6 +16,10 @@ export type TelegramState = {
 	bids: number;
 	equityInvested: number;
 	equityRedeemed: number;
+	ccipProposalNew: number;
+	ccipProposalDenied: number;
+	ccipProposalEnacted: number;
+	ccipRateLimit: number;
 };
 
 export type PositionPriceAlertState = {

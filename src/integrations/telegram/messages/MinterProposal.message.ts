@@ -1,5 +1,5 @@
 import { MinterQuery } from 'modules/ecosystem/ecosystem.minter.types';
-import { formatCurrency, shortenString } from 'utils/format';
+import { escapeMd, formatCurrency, shortenString } from 'utils/format';
 import { AppUrl, ExplorerTxUrl, getChain } from 'utils/func-helper';
 import { Chain } from 'viem';
 
@@ -14,7 +14,7 @@ export function MinterProposalMessage(minter: MinterQuery): string {
 💰 Fee: *${formatCurrency(minter.applicationFee / 1e18, 2, 2)} ZCHF*
 ⏱ Period: *${hours} hours*
 ⏰ Veto Until: *${vetoDeadline.toUTCString()}*
-💬 Message: ${minter.applyMessage || '—'}
+💬 Message: ${escapeMd(minter.applyMessage || '—')}
 
 [🏛️ Governance](${AppUrl('/governance')}) · [🔍 Explorer](${ExplorerTxUrl(minter.txHash, getChain(minter.chainId) as Chain)})`;
 }

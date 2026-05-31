@@ -1,6 +1,6 @@
 {
 	"name": "@frankencoin/api",
-	"version": "0.3.15",
+	"version": "0.3.16",
 	"private": false,
 	"license": "MIT",
 	"main": "./exports/dist/index.js",
@@ -35,6 +35,8 @@
 		"migrate:storj": "ts-node prisma/scripts/migrate-storj-to-db.ts",
 		"verify:migration": "ts-node prisma/scripts/verify-migration.ts",
 		"telegram:mocks": "ts-node -r tsconfig-paths/register scripts/send-telegram-mocks.ts",
+		"telegram:groups": "ts-node -r tsconfig-paths/register scripts/list-telegram-groups.ts",
+		"telegram:migrate-weekly": "ts-node -r tsconfig-paths/register scripts/migrate-daily-to-weekly-subs.ts",
 		"infra:up": "docker stack deploy -c stack.testing.yml frankencoin-api",
 		"infra:down": "docker stack remove frankencoin-api"
 	},

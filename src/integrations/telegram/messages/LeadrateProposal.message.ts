@@ -1,6 +1,6 @@
 import { LeadrateProposedQuery, LeadrateRateQuery } from 'modules/savings/savings.leadrate.types';
 import { formatCurrency, shortenString } from 'utils/format';
-import { AppUrl, ExplorerTxUrl } from 'utils/func-helper';
+import { AppUrl, ExplorerTxUrl, getChain } from 'utils/func-helper';
 
 export function LeadrateProposalMessage(proposal: LeadrateProposedQuery, rates: LeadrateRateQuery[]): string {
 	const deadline = new Date(proposal.nextChange * 1000);
@@ -17,5 +17,5 @@ export function LeadrateProposalMessage(proposal: LeadrateProposedQuery, rates: 
 
 ${isUnchanged ? '*Rate will remain unchanged*' : '*Rate can be applied after 7 days*'}
 
-[🏛️ Governance](${AppUrl('/governance')}) · [🔍 Explorer](${ExplorerTxUrl(proposal.txHash)})`;
+[🏛️ Governance](${AppUrl('/governance')}) · [🔍 Explorer](${ExplorerTxUrl(proposal.txHash, getChain(proposal.chainId))})`;
 }

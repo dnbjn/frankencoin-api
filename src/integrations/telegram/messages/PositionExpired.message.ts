@@ -1,5 +1,5 @@
 import { PositionQuery } from 'modules/positions/positions.types';
-import { formatCurrency, shortenString } from 'utils/format';
+import { escapeMd, formatCurrency, shortenString } from 'utils/format';
 import { AppUrl, ExplorerAddressUrl } from 'utils/func-helper';
 import { formatUnits } from 'viem';
 
@@ -13,14 +13,17 @@ export function PositionExpiredMessage(position: PositionQuery): string {
 	const t1 = new Date(position.expiration * 1000 + duration);
 	const t2 = new Date(position.expiration * 1000 + 2 * duration);
 
+	const sym = escapeMd(position.collateralSymbol);
+	const name = escapeMd(position.collateralName);
+
 	const header = `💀 *Position Expired*
 
 🏦 Position: \`${shortenString(position.position)}\` (v${position.version})
 👤 Owner: \`${shortenString(position.owner)}\`
 
-💎 Collateral: *${position.collateralName} (${position.collateralSymbol})*
+💎 Collateral: *${name} (${sym})*
    Address: \`${shortenString(position.collateral)}\`
-   Balance: *${formatCurrency(bal, 2, 2)} ${position.collateralSymbol}* (min *${formatCurrency(min, 2, 2)}*)
+   Balance: *${formatCurrency(bal, 2, 2)} ${sym}* (min *${formatCurrency(min, 2, 2)}*)
 
 💵 Minted: *${formatCurrency(formatUnits(BigInt(position.minted), 18), 2, 2)} ZCHF*
    Reserve: *${formatCurrency(position.reserveContribution / 10000, 1, 1)}%* · Auction: *${Math.floor(position.challengePeriod / 3600)} hours*`;
@@ -29,7 +32,7 @@ export function PositionExpiredMessage(position: PositionQuery): string {
 
 ⚔️ *Challenge Available*
    1x → 0x from: *${t0.toUTCString()}*
-   Price (1x): *${formatCurrency(price, 2, 2)} ZCHF/${position.collateralSymbol}*
+   Price (1x): *${formatCurrency(price, 2, 2)} ZCHF/${sym}*
    Zero at: *${t1.toUTCString()}*`;
 
 	const v2Body = `

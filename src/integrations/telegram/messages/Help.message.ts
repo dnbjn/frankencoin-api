@@ -4,7 +4,7 @@ import { mainnet } from 'viem/chains';
 const HANDLE_LABELS: Record<string, string> = {
 	'/MintingUpdates': '📊 Minting Updates',
 	'/PriceAlerts': '⚠️ Price Alerts',
-	'/DailyInfos': '📅 Daily Infos (weekly)',
+	'/WeeklyInfos': '📅 Weekly Infos',
 };
 
 export function HelpMessage(handles: string[], chatSubs: { [handle: string]: boolean }): string {

@@ -11,6 +11,7 @@ import { appConfig, ponderConfig, viemConfig, coingeckoConfig } from 'config/ind
 
 // Feature modules
 import { AnalyticsModule } from 'modules/analytics/analytics.module';
+import { BridgeModule } from 'modules/bridge/bridge.module';
 import { ChallengesModule } from 'modules/challenges/challenges.module';
 import { EcosystemModule } from 'modules/ecosystem/ecosystem.module';
 import { PositionsModule } from 'modules/positions/positions.module';
@@ -36,6 +37,7 @@ import { ApiService } from 'app.service';
 		DataSourceModule,
 
 		// Feature modules
+		BridgeModule,
 		PositionsModule,
 		EcosystemModule,
 		PricesModule,

@@ -8,7 +8,7 @@ export function WelcomeGroupMessage(group: string | number, handles: string[]): 
 			const labels: Record<string, string> = {
 				'/MintingUpdates': '📊 /MintingUpdates — new minting transactions',
 				'/PriceAlerts': '⚠️ /PriceAlerts — collateral price warnings',
-				'/DailyInfos': '📅 /DailyInfos — weekly ecosystem summary',
+				'/WeeklyInfos': '📅 /WeeklyInfos — weekly ecosystem summary',
 			};
 			return labels[h] ?? h;
 		})

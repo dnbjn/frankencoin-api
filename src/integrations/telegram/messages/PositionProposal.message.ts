@@ -1,5 +1,5 @@
 import { PositionQuery } from 'modules/positions/positions.types';
-import { formatCurrency, shortenString } from 'utils/format';
+import { escapeMd, formatCurrency, shortenString } from 'utils/format';
 import { AppUrl, ExplorerAddressUrl } from 'utils/func-helper';
 import { formatUnits } from 'viem';
 
@@ -11,16 +11,19 @@ export function PositionProposalMessage(position: PositionQuery): string {
 	const expiryDays = Math.floor((position.expiration * 1000 - Date.now()) / 1000 / 60 / 60 / 24);
 	const auctionHours = Math.floor(position.challengePeriod / 3600);
 
+	const sym = escapeMd(position.collateralSymbol);
+	const name = escapeMd(position.collateralName);
+
 	return `📋 *New Position Proposal*
 
 📅 Start: *${start}*
 🏦 Position: \`${shortenString(position.position)}\` (v${position.version})
 👤 Owner: \`${shortenString(position.owner)}\`
 
-💎 Collateral: *${position.collateralName} (${position.collateralSymbol})*
+💎 Collateral: *${name} (${sym})*
    Address: \`${shortenString(position.collateral)}\`
-   Balance: *${formatCurrency(bal, 2, 2)} ${position.collateralSymbol}*
-   Min Balance: *${formatCurrency(min, 2, 2)} ${position.collateralSymbol}*
+   Balance: *${formatCurrency(bal, 2, 2)} ${sym}*
+   Min Balance: *${formatCurrency(min, 2, 2)} ${sym}*
    Liq. Price: *${formatCurrency(price, 2, 2)} ZCHF*
 
 📊 Terms
@@ -30,6 +33,6 @@ export function PositionProposalMessage(position: PositionQuery): string {
    Auction: *${auctionHours} hours*
    Expiry: *${expiryDays} days*
 
-[⚔️ Challenge](${AppUrl(`/monitoring/${position.position}/challenge`)}) · [🚫 Veto](${AppUrl(`/monitoring/${position.position}/veto`)})
+[⚔️ Challenge](${AppUrl(`/monitoring/${position.position}/challenge`)}) · [🚫 Veto](${AppUrl(`/governance`)})
 [🔍 Position](${ExplorerAddressUrl(position.position)}) · [🔍 Owner](${ExplorerAddressUrl(position.owner)})`;
 }

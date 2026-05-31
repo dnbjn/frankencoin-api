@@ -50,3 +50,8 @@ export function timestampToSeconds(ms: number | string) {
 export function timestampStartOfDay(ms: number | string) {
 	return String(Number(ms) - (Number(ms) % 86_400_000));
 }
+
+// Escape Telegram MarkdownV1 special characters in user-supplied strings
+export function escapeMd(text: string): string {
+	return String(text).replace(/[\\*_`[]/g, '\\$&');
+}
